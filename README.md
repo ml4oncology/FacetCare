@@ -11,9 +11,6 @@ Plan-driven clinic workflow orchestration with LLM tasks (llama.cpp/vLLM compati
   - generates clinic-ready artifacts for selected patients only
   - packages everything into a Review Bundle for human review
 
-## Install
-pip install pydantic openai
-
 ## Run
 python demo.py or python web_app.py
 
