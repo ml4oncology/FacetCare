@@ -1,4 +1,4 @@
-# medflow_project
+# FacetCare
 
 Plan-driven clinic workflow orchestration with LLM tasks (llama.cpp/vLLM compatible).
 
