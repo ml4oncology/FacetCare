@@ -15,6 +15,6 @@ Plan-driven clinic workflow orchestration with LLM tasks (llama.cpp/vLLM compati
 pip install pydantic openai
 
 ## Run
-python demo.py
+python demo.py or python web_app.py
 
-Edit demo.py to match your local llama.cpp base_url and served model name.
+Edit demo.py or web_app.py to match your base_url and served model name.
