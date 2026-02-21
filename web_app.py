@@ -533,8 +533,6 @@ function setExample(key) {
     return render_template_string(tpl, default_desc=default_desc, msg=msg)
 
 
-
-
 @app.route("/plan", methods=["GET", "POST"])
 def plan_page():
     global current_plan
@@ -622,59 +620,561 @@ def plan_page():
             }
         )
 
-    tpl = """
-    <html><body>
-      <h2>Plan Editor</h2>
-      <p><a href='{{ url_for("setup_plan") }}'>Setup</a> | <a href='{{ url_for("results_page") }}'>Results</a></p>
-      {% if msg %}<p style='color:#060;'>{{ msg }}</p>{% endif %}
-      <form method="post">
-        <p>
-          Target condition (optional): <input name="target_condition" size="40" value="{{ plan.target_condition or '' }}">
-          Horizon months (optional): <input name="horizon_months" size="6" value="{{ plan.horizon_months or '' }}">
-        </p>
-        <p>
-          Cadence: <input name="cadence" size="10" value="{{ plan.constraints.cadence }}">
-          Review limit: <input name="review_limit" size="6" value="{{ plan.constraints.review_limit }}">
-          Dedup days: <input name="dedup_days" size="6" value="{{ plan.constraints.dedup_days }}">
-        </p>
-        <p>
-          Candidate pool strategy: <input name="candidate_pool_strategy" size="20" value="{{ plan.constraints.candidate_pool.strategy }}">
-          Max candidates: <input name="max_candidates" size="8" value="{{ plan.constraints.candidate_pool.max_candidates or '' }}">
-          Keywords CSV: <input name="candidate_pool_keywords" size="60" value="{{ (plan.constraints.candidate_pool.keywords or [])|join(', ') }}">
-        </p>
-        <p>
-          Selection source task: <input name="selection_source_task" size="22" value="{{ plan.constraints.selection.source_task or '' }}">
-          Method: <input name="selection_method" size="18" value="{{ plan.constraints.selection.method }}">
-          K: <input name="selection_k" size="6" value="{{ plan.constraints.selection.k }}">
-          Threshold: <input name="selection_threshold" size="8" value="{{ plan.constraints.selection.threshold if plan.constraints.selection.threshold is not none else '' }}">
-        </p>
-        <p>
-          Risk low_lt: <input name="risk_low_lt" size="8" value="{{ plan.constraints.risk_level_policy.low_lt }}">
-          Risk moderate_lt: <input name="risk_moderate_lt" size="8" value="{{ plan.constraints.risk_level_policy.moderate_lt }}">
-        </p>
-        <h3>Tasks</h3>
-        <table border="1" cellpadding="6" cellspacing="0">
-          <tr><th>Order</th><th>Enable</th><th>Task</th><th>Depends on</th><th>Params (JSON)</th></tr>
-          {% for t in task_rows %}
-          <tr>
-            <td><input name="order__{{ t.name }}" size="4" value="{{ loop.index }}"></td>
-            <td><input type="checkbox" name="enabled__{{ t.name }}" {% if t.enabled %}checked{% endif %}></td>
-            <td><b>{{ t.name }}</b></td>
-            <td>{{ t.depends_on }}</td>
-            <td><textarea name="params__{{ t.name }}" rows="4" cols="55">{{ t.params_text }}</textarea></td>
-          </tr>
-          {% endfor %}
-        </table>
-        <p>
-          <button type="submit">Save Plan</button>
-          <button type="button" onclick="window.location='{{ url_for("run_plan") }}'">Run Plan</button>
-        </p>
-      </form>
-      <h3>Raw Plan JSON</h3>
-      <pre style="background:#f4f4f4;padding:12px;max-width:1200px;overflow:auto;">{{ plan_json }}</pre>
-    </body></html>
-    """
+        tpl = """
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>MedFlow — Review &amp; Configure Plan</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet"/>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet"/>
+  <style>
+    body { background-color: #f0f4f8; font-family: 'Segoe UI', sans-serif; }
+    .brand-bar {
+      background: linear-gradient(90deg, #1a3c5e 0%, #2563a8 100%);
+      padding: 1.1rem 2rem; color: white;
+    }
+    .brand-bar .brand-title { font-size: 1.6rem; font-weight: 700; letter-spacing: 0.03em; }
+    .brand-bar .brand-subtitle { font-size: 0.88rem; opacity: 0.82; margin-top: 0.1rem; }
+    .card-panel {
+      border: none; border-radius: 12px;
+      box-shadow: 0 4px 24px rgba(30,60,100,0.10);
+      background: white;
+    }
+    .section-label {
+      font-size: 0.78rem; font-weight: 600;
+      text-transform: uppercase; letter-spacing: 0.07em;
+      color: #6b7a8d; margin-bottom: 0.3rem;
+    }
+    .field-hint { font-size: 0.82rem; color: #7a8898; margin-top: 0.25rem; }
+    .step-badge {
+      display: inline-flex; align-items: center; justify-content: center;
+      background: #2563a8; color: white; border-radius: 50%;
+      width: 24px; height: 24px; font-size: 0.78rem; font-weight: 700;
+      margin-right: 0.5rem; flex-shrink: 0;
+    }
+    .btn-primary-medflow {
+      background: linear-gradient(90deg, #1a3c5e, #2563a8);
+      color: white; border: none; border-radius: 8px;
+      padding: 0.6rem 1.8rem; font-weight: 600;
+    }
+    .btn-primary-medflow:hover { opacity: 0.9; color: white; }
+    .btn-run {
+      background: linear-gradient(90deg, #145a32, #1e8449);
+      color: white; border: none; border-radius: 8px;
+      padding: 0.6rem 1.8rem; font-weight: 600;
+    }
+    .btn-run:hover { opacity: 0.9; color: white; }
+    .btn-run:disabled {
+      background: #adb5bd; cursor: not-allowed; opacity: 0.7;
+    }
+
+    /* ── Task cards ── */
+    .task-zone {
+      min-height: 80px; border-radius: 10px;
+      border: 2px dashed #c5d8f5; padding: 0.75rem;
+      background: #f7faff; transition: background 0.2s;
+    }
+    .task-zone.drag-over { background: #dceeff; border-color: #2563a8; }
+    .task-card {
+      background: white; border-radius: 8px;
+      border: 1px solid #dde6f0;
+      box-shadow: 0 2px 6px rgba(30,60,100,0.07);
+      padding: 0.65rem 0.9rem;
+      margin-bottom: 0.5rem;
+      cursor: grab; display: flex; align-items: flex-start; gap: 0.6rem;
+      transition: box-shadow 0.15s;
+      user-select: none;
+    }
+    .task-card:active { cursor: grabbing; box-shadow: 0 6px 18px rgba(30,60,100,0.18); }
+    .task-card.dragging { opacity: 0.45; }
+    .task-icon { font-size: 1.2rem; margin-top: 0.05rem; flex-shrink: 0; }
+    .task-name { font-weight: 600; font-size: 0.9rem; color: #1a3c5e; }
+    .task-desc { font-size: 0.78rem; color: #6b7a8d; margin-top: 0.1rem; }
+    .task-badge-dep {
+      display: inline-block; font-size: 0.72rem;
+      background: #e8f0fb; color: #1a4080;
+      border-radius: 12px; padding: 0.1rem 0.5rem;
+      margin-top: 0.25rem; margin-right: 0.2rem;
+    }
+    .params-toggle { font-size: 0.75rem; color: #2563a8; cursor: pointer; margin-top: 0.3rem; text-decoration: underline dotted; }
+    .params-box { display: none; margin-top: 0.4rem; }
+    .params-box textarea { font-size: 0.78rem; font-family: monospace; border-radius: 6px; }
+    .dep-error {
+      font-size: 0.75rem; color: #c0392b; background: #fdf0ef;
+      border: 1px solid #f5c6c6; border-radius: 6px;
+      padding: 0.25rem 0.6rem; margin-top: 0.3rem; display: none;
+    }
+    .unsaved-banner {
+      display: none; background: #fff3cd; border: 1px solid #ffc107;
+      border-radius: 8px; padding: 0.5rem 1rem;
+      font-size: 0.86rem; color: #7d5a00;
+      align-items: center; gap: 0.5rem;
+    }
+  </style>
+</head>
+<body>
+
+<!-- Brand bar -->
+<div class="brand-bar d-flex align-items-center gap-3">
+  <i class="bi bi-heart-pulse-fill fs-3"></i>
+  <div>
+    <div class="brand-title">MedFlow</div>
+    <div class="brand-subtitle">AI-Assisted Clinical Risk Screening &amp; Workflow Orchestration</div>
+  </div>
+  <div class="ms-auto">
+    <a href="/setup" class="btn btn-sm btn-light text-primary fw-semibold">
+      <i class="bi bi-arrow-left-circle me-1"></i>Back to Setup
+    </a>
+  </div>
+</div>
+
+<div class="container py-4" style="max-width:860px;">
+
+  <!-- Unsaved changes banner -->
+  <div class="unsaved-banner d-flex mb-3" id="unsavedBanner">
+    <i class="bi bi-exclamation-triangle-fill"></i>
+    <span>You have unsaved changes. Please click <strong>Save Plan</strong> before running.</span>
+  </div>
+
+  {% if msg %}
+  <div class="alert {% if 'error' in msg.lower() or 'invalid' in msg.lower() or 'failed' in msg.lower() %}alert-danger{% else %}alert-success{% endif %} d-flex align-items-center gap-2 mb-3">
+    <i class="bi {% if 'error' in msg.lower() or 'invalid' in msg.lower() or 'failed' in msg.lower() %}bi-exclamation-triangle-fill{% else %}bi-check-circle-fill{% endif %}"></i>
+    <div>{{ msg }}</div>
+  </div>
+  {% endif %}
+
+  <form method="POST" action="/plan" id="planForm">
+
+    <!-- ── Section 1: Screening parameters ── -->
+    <div class="card-panel p-4 mb-4">
+      <div class="d-flex align-items-center mb-3">
+        <span class="step-badge">1</span>
+        <h5 class="fw-bold mb-0" style="color:#1a3c5e;">Screening Parameters</h5>
+      </div>
+      <p class="text-muted mb-3" style="font-size:0.88rem;">
+        These parameters control what condition is screened, over what time horizon, and how patients are scheduled for review.
+        Fields marked <span class="text-danger">*</span> are required.
+      </p>
+
+      <div class="row g-3">
+        <div class="col-md-6">
+          <label class="form-label section-label">Target Condition <span class="text-danger">*</span></label>
+          <input type="text" class="form-control tracked" name="target_condition"
+            value="{{ plan.target_condition or '' }}"
+            placeholder="e.g. pancreatic_cancer"
+            style="border-radius:8px;"/>
+          <div class="field-hint">The cancer or clinical condition to screen for. Use underscores (e.g. <code>colorectal_cancer</code>).</div>
+        </div>
+        <div class="col-md-3">
+          <label class="form-label section-label">Risk Horizon (months) <span class="text-danger">*</span></label>
+          <input type="number" class="form-control tracked" name="horizon_months"
+            value="{{ plan.horizon_months or '' }}"
+            min="1" max="120" placeholder="e.g. 36"
+            style="border-radius:8px;"/>
+          <div class="field-hint">Timeframe for risk assessment (1–120 months).</div>
+        </div>
+        <div class="col-md-3">
+          <label class="form-label section-label">Review Cadence <span class="text-danger">*</span></label>
+          <select class="form-select tracked" name="cadence" style="border-radius:8px;">
+            {% for opt in ['daily','weekly','monthly','per_visit','yearly'] %}
+            <option value="{{ opt }}" {% if plan.constraints.cadence == opt %}selected{% endif %}>
+              {{ opt|capitalize }}
+            </option>
+            {% endfor %}
+          </select>
+          <div class="field-hint">How often the screening workflow runs.</div>
+        </div>
+        <div class="col-md-3">
+          <label class="form-label section-label">Patients per Review <span class="text-danger">*</span></label>
+          <input type="number" class="form-control tracked" name="review_limit"
+            value="{{ plan.constraints.review_limit }}"
+            min="1" max="200"
+            style="border-radius:8px;"/>
+          <div class="field-hint">Max patients shortlisted each session (e.g. 5).</div>
+        </div>
+        <div class="col-md-3">
+          <label class="form-label section-label">Deduplication Window (days)</label>
+          <input type="number" class="form-control tracked" name="dedup_days"
+            value="{{ plan.constraints.dedup_days }}"
+            min="0"
+            style="border-radius:8px;"/>
+          <div class="field-hint">A patient reviewed within this many days will not be shortlisted again (0 = no limit).</div>
+        </div>
+        <div class="col-md-3">
+          <label class="form-label section-label">Selection Method</label>
+          <select class="form-select tracked" name="selection_method" style="border-radius:8px;">
+            {% for opt in ['top_k','threshold','threshold_then_top_k','first_k'] %}
+            <option value="{{ opt }}" {% if plan.constraints.selection.method == opt %}selected{% endif %}>
+              {{ opt.replace('_',' ')|title }}
+            </option>
+            {% endfor %}
+          </select>
+          <div class="field-hint">How patients are ranked and selected from the scored pool.</div>
+        </div>
+        <div class="col-md-3">
+          <label class="form-label section-label">Risk Threshold — Low (&lt;)</label>
+          <input type="number" class="form-control tracked" name="risk_low_lt" step="0.01" min="0" max="1"
+            value="{{ plan.constraints.risk_level_policy.low_lt }}"
+            style="border-radius:8px;"/>
+          <div class="field-hint">Patients below this probability (0–1) are classified as <strong>low risk</strong>.</div>
+        </div>
+        <div class="col-md-3">
+          <label class="form-label section-label">Risk Threshold — Moderate (&lt;)</label>
+          <input type="number" class="form-control tracked" name="risk_moderate_lt" step="0.01" min="0" max="1"
+            value="{{ plan.constraints.risk_level_policy.moderate_lt }}"
+            style="border-radius:8px;"/>
+          <div class="field-hint">Patients between the low and this value are <strong>moderate risk</strong>; above is <strong>high risk</strong>.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Hidden inputs for task state (populated by JS) -->
+    <div id="taskHiddenInputs"></div>
+
+    <!-- ── Section 2: Task configuration ── -->
+    <div class="card-panel p-4 mb-4">
+      <div class="d-flex align-items-center mb-1">
+        <span class="step-badge">2</span>
+        <h5 class="fw-bold mb-0" style="color:#1a3c5e;">Workflow Tasks</h5>
+      </div>
+      <p class="text-muted mb-3" style="font-size:0.88rem;">
+        The AI has suggested the tasks below based on your clinic description.
+        <strong>Drag</strong> a task to move it between Active and Available.
+        Tasks with unmet prerequisites cannot be activated — hover to see why.
+      </p>
+
+      <div class="row g-3">
+        <!-- Active tasks -->
+        <div class="col-md-6">
+          <div class="d-flex align-items-center mb-2 gap-2">
+            <i class="bi bi-check-circle-fill text-success"></i>
+            <span class="fw-semibold" style="color:#145a32;">Active Tasks</span>
+            <span class="badge bg-success ms-1" id="activeCount">0</span>
+          </div>
+          <div class="field-hint mb-2">These tasks will run for each selected patient.</div>
+          <div class="task-zone" id="activeZone" ondragover="onDragOver(event)" ondrop="onDrop(event, 'active')" ondragleave="onDragLeave(event)">
+            <div id="activeEmpty" class="text-center text-muted py-3" style="font-size:0.82rem; display:none;">
+              <i class="bi bi-inbox fs-4 d-block mb-1"></i>No active tasks. Drag tasks here.
+            </div>
+          </div>
+        </div>
+
+        <!-- Available tasks -->
+        <div class="col-md-6">
+          <div class="d-flex align-items-center mb-2 gap-2">
+            <i class="bi bi-circle text-secondary"></i>
+            <span class="fw-semibold" style="color:#6b7a8d;">Available (Inactive) Tasks</span>
+            <span class="badge bg-secondary ms-1" id="inactiveCount">0</span>
+          </div>
+          <div class="field-hint mb-2">Drag a task to Active to include it in the workflow.</div>
+          <div class="task-zone" id="inactiveZone" ondragover="onDragOver(event)" ondrop="onDrop(event, 'inactive')" ondragleave="onDragLeave(event)">
+            <div id="inactiveEmpty" class="text-center text-muted py-3" style="font-size:0.82rem; display:none;">
+              <i class="bi bi-check-all fs-4 d-block mb-1"></i>All tasks are active.
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Save & Run ── -->
+    <div class="card-panel p-4 d-flex flex-wrap align-items-center justify-content-between gap-3">
+      <div>
+        <div class="fw-semibold" style="color:#1a3c5e;">Ready to proceed?</div>
+        <div class="field-hint">Save your plan first, then run the screening workflow.</div>
+      </div>
+      <div class="d-flex gap-2 flex-wrap">
+        <button type="submit" class="btn btn-primary-medflow" id="saveBtn">
+          <i class="bi bi-floppy me-1"></i>Save Plan
+        </button>
+        <a href="/run" class="btn btn-run" id="runBtn">
+          <i class="bi bi-play-fill me-1"></i>Run Screening
+        </a>
+      </div>
+    </div>
+
+  </form>
+</div>
+
+<!-- Task metadata from Python -->
+<script>
+const TASK_META = {
+  "intake_workflow":            { icon: "bi-hospital",          desc: "Generates a structured clinic workflow profile from your description." },
+  "risk_assessment":            { icon: "bi-graph-up-arrow",    desc: "Scores each patient's risk probability for the target condition using their clinical notes." },
+  "queue_prioritization":       { icon: "bi-sort-down",         desc: "Ranks patients by urgency to help prioritise the review queue." },
+  "clinician_summary":          { icon: "bi-file-earmark-text", desc: "Produces a concise chart summary with suggested orders and referrals for the clinician." },
+  "admin_referral":             { icon: "bi-send",              desc: "Generates a structured referral payload for administrative processing." },
+  "patient_instructions":       { icon: "bi-person-lines-fill", desc: "Drafts plain-language instructions for the patient regarding next steps." },
+  "results_summary":            { icon: "bi-clipboard2-data",   desc: "Summarises lab, imaging, and trending data from the patient's notes." },
+  "transcription":              { icon: "bi-mic",               desc: "Placeholder for audio transcription; passes notes through as-is in this demo." },
+  "referral_letter":            { icon: "bi-envelope-paper",    desc: "Drafts a formal referral letter addressed to the receiving clinician or service." },
+  "differential_diagnosis":     { icon: "bi-search",            desc: "Lists possible diagnoses with supporting reasoning from the clinical notes." },
+  "guideline_comparison":       { icon: "bi-journals",          desc: "Compares the patient's situation against relevant clinical guidelines." },
+  "followup_gap_detection":     { icon: "bi-calendar-x",        desc: "Identifies missed follow-ups, pending results, and care gaps in the notes." },
+  "referral_intake_checklist":  { icon: "bi-card-checklist",    desc: "Produces a structured checklist for the receiving service's intake process." },
+  "lab_trend_summary":          { icon: "bi-activity",          desc: "Summarises lab value trends over time with clinician and patient-friendly narratives." },
+  "care_plan_reconciliation":   { icon: "bi-arrow-repeat",      desc: "Compares prior care plan items against current notes to flag completed, changed, or unresolved items." }
+};
+
+const DEPENDS_ON = {
+  "clinician_summary":         ["risk_assessment"],
+  "admin_referral":            ["risk_assessment"],
+  "patient_instructions":      ["risk_assessment"],
+  "referral_letter":           ["risk_assessment"],
+  "differential_diagnosis":    ["risk_assessment"],
+  "guideline_comparison":      ["risk_assessment"],
+  "referral_intake_checklist": ["admin_referral"],
+  "queue_prioritization":      [],
+  "lab_trend_summary":         [],
+  "followup_gap_detection":    [],
+  "care_plan_reconciliation":  [],
+  "results_summary":           [],
+  "intake_workflow":           [],
+  "transcription":             [],
+  "risk_assessment":           []
+};
+
+// Initial task state from Python
+const INITIAL_TASKS = [
+  {% for t in task_rows %}
+  {
+    name: {{ t.name | tojson }},
+    enabled: {{ 'true' if t.enabled else 'false' }},
+    params: {{ t.params_text | tojson }},
+    order: {{ loop.index }}
+  },
+  {% endfor %}
+];
+
+// ── State ──
+let taskState = {};  // name -> { enabled, params, order }
+let dragSrc = null;
+let planSaved = true;
+
+function init() {
+  INITIAL_TASKS.forEach(t => {
+    taskState[t.name] = { enabled: t.enabled, params: t.params, order: t.order };
+  });
+  renderAllTasks();
+  updateRunButton();
+}
+
+function getActiveNames() {
+  return Object.entries(taskState)
+    .filter(([,v]) => v.enabled)
+    .sort((a,b) => a[1].order - b[1].order)
+    .map(([k]) => k);
+}
+
+function getInactiveNames() {
+  return Object.entries(taskState)
+    .filter(([,v]) => !v.enabled)
+    .sort((a,b) => a[1].order - b[1].order)
+    .map(([k]) => k);
+}
+
+function renderAllTasks() {
+  const az = document.getElementById('activeZone');
+  const iz = document.getElementById('inactiveZone');
+  // Clear existing cards (keep empty placeholders)
+  az.querySelectorAll('.task-card').forEach(el => el.remove());
+  iz.querySelectorAll('.task-card').forEach(el => el.remove());
+
+  const active = getActiveNames();
+  const inactive = getInactiveNames();
+
+  active.forEach((name, idx) => az.appendChild(makeCard(name, true, idx)));
+  inactive.forEach((name, idx) => iz.appendChild(makeCard(name, false, idx)));
+
+  document.getElementById('activeCount').textContent = active.length;
+  document.getElementById('inactiveCount').textContent = inactive.length;
+
+  document.getElementById('activeEmpty').style.display = active.length === 0 ? 'block' : 'none';
+  document.getElementById('inactiveEmpty').style.display = inactive.length === 0 ? 'block' : 'none';
+
+  buildHiddenInputs();
+}
+
+function makeCard(name, enabled, idx) {
+  const meta = TASK_META[name] || { icon: 'bi-gear', desc: 'Custom task.' };
+  const deps = DEPENDS_ON[name] || [];
+  const unmet = deps.filter(d => !taskState[d] || !taskState[d].enabled);
+
+  const card = document.createElement('div');
+  card.className = 'task-card' + (enabled && unmet.length > 0 ? ' border-warning' : '');
+  card.draggable = true;
+  card.dataset.name = name;
+
+  const depsHtml = deps.length
+    ? deps.map(d => `<span class="task-badge-dep"><i class="bi bi-arrow-return-right"></i> ${d}</span>`).join('')
+    : '';
+
+  const unmetHtml = (enabled && unmet.length > 0)
+    ? `<div class="dep-error" style="display:block;"><i class="bi bi-exclamation-triangle-fill me-1"></i>Requires: ${unmet.join(', ')}</div>`
+    : '';
+
+  const paramsDisplay = taskState[name].params && taskState[name].params !== '{}' ? taskState[name].params : '{}';
+
+  card.innerHTML = `
+    <i class="bi ${meta.icon} task-icon" style="color:#2563a8;"></i>
+    <div class="flex-grow-1">
+      <div class="d-flex align-items-center gap-2">
+        <span class="task-name">${name.replace(/_/g,' ').replace(/\b\w/g,c=>c.toUpperCase())}</span>
+        <span class="badge ${enabled ? 'bg-success' : 'bg-secondary'}" style="font-size:0.68rem;">${enabled ? 'Active' : 'Inactive'}</span>
+      </div>
+      <div class="task-desc">${meta.desc}</div>
+      ${depsHtml ? `<div class="mt-1">${depsHtml}</div>` : ''}
+      ${unmetHtml}
+      <div class="params-toggle" onclick="toggleParams('${name}')">
+        <i class="bi bi-sliders2 me-1"></i>Advanced parameters
+      </div>
+      <div class="params-box" id="params-${name}">
+        <textarea class="form-control" rows="3" placeholder='{"key": "value"}'
+          onchange="updateParams('${name}', this.value)"
+          oninput="markUnsaved()">${paramsDisplay}</textarea>
+        <div class="field-hint">Optional JSON key-value pairs passed to this task. Leave as <code>{}</code> unless advised.</div>
+      </div>
+    </div>
+    <i class="bi bi-grip-vertical text-secondary" style="font-size:1.1rem; margin-top:2px; cursor:grab;"></i>
+  `;
+
+  card.addEventListener('dragstart', e => {
+    dragSrc = name;
+    setTimeout(() => card.classList.add('dragging'), 0);
+    e.dataTransfer.effectAllowed = 'move';
+  });
+  card.addEventListener('dragend', () => card.classList.remove('dragging'));
+
+  return card;
+}
+
+function toggleParams(name) {
+  const box = document.getElementById('params-' + name);
+  box.style.display = box.style.display === 'block' ? 'none' : 'block';
+}
+
+function updateParams(name, val) {
+  taskState[name].params = val;
+  buildHiddenInputs();
+}
+
+function onDragOver(e) {
+  e.preventDefault();
+  e.currentTarget.classList.add('drag-over');
+}
+
+function onDragLeave(e) {
+  e.currentTarget.classList.remove('drag-over');
+}
+
+function onDrop(e, zone) {
+  e.preventDefault();
+  e.currentTarget.classList.remove('drag-over');
+  if (!dragSrc) return;
+
+  const name = dragSrc;
+  const toActive = zone === 'active';
+
+  // Dependency check when activating
+  if (toActive) {
+    const deps = DEPENDS_ON[name] || [];
+    const unmet = deps.filter(d => !taskState[d] || !taskState[d].enabled);
+    if (unmet.length > 0) {
+      showDepToast(name, unmet);
+      dragSrc = null;
+      return;
+    }
+  }
+
+  // Deactivation check: if removing, warn if other active tasks depend on this
+  if (!toActive) {
+    const dependents = Object.entries(DEPENDS_ON)
+      .filter(([k, deps]) => deps.includes(name) && taskState[k] && taskState[k].enabled)
+      .map(([k]) => k);
+    if (dependents.length > 0) {
+      showDepToast(name, [], dependents);
+      dragSrc = null;
+      return;
+    }
+  }
+
+  taskState[name].enabled = toActive;
+  // Re-assign order within zone
+  const siblings = toActive ? getActiveNames().filter(n => n !== name) : getInactiveNames().filter(n => n !== name);
+  taskState[name].order = siblings.length + 1;
+  dragSrc = null;
+  renderAllTasks();
+  markUnsaved();
+}
+
+function showDepToast(name, unmet, dependents) {
+  const existing = document.getElementById('depToast');
+  if (existing) existing.remove();
+  const label = name.replace(/_/g,' ').replace(/\b\w/g,c=>c.toUpperCase());
+  let msg;
+  if (unmet && unmet.length)
+    msg = `<strong>${label}</strong> requires these tasks to be active first: <strong>${unmet.join(', ')}</strong>.`;
+  else
+    msg = `Cannot deactivate <strong>${label}</strong> — other active tasks depend on it: <strong>${dependents.join(', ')}</strong>.`;
+  const toast = document.createElement('div');
+  toast.id = 'depToast';
+  toast.className = 'alert alert-warning d-flex align-items-center gap-2 position-fixed';
+  toast.style.cssText = 'bottom:1.5rem;left:50%;transform:translateX(-50%);z-index:9999;min-width:340px;max-width:580px;box-shadow:0 4px 18px rgba(0,0,0,0.15);';
+  toast.innerHTML = `<i class="bi bi-exclamation-triangle-fill"></i><div>${msg}</div>`;
+  document.body.appendChild(toast);
+  setTimeout(() => { if (toast.parentNode) toast.remove(); }, 4000);
+}
+
+function buildHiddenInputs() {
+  const container = document.getElementById('taskHiddenInputs');
+  container.innerHTML = '';
+  Object.entries(taskState).forEach(([name, state], idx) => {
+    const add = (n, v) => {
+      const inp = document.createElement('input');
+      inp.type = 'hidden'; inp.name = n; inp.value = v;
+      container.appendChild(inp);
+    };
+    if (state.enabled) add(`enabled__${name}`, 'on');
+    add(`params__${name}`, state.params || '{}');
+    add(`order__${name}`, state.order || idx + 1);
+  });
+}
+
+function markUnsaved() {
+  planSaved = false;
+  document.getElementById('unsavedBanner').style.display = 'flex';
+  updateRunButton();
+}
+
+function updateRunButton() {
+  const btn = document.getElementById('runBtn');
+  if (!planSaved) {
+    btn.classList.add('disabled');
+    btn.setAttribute('aria-disabled', 'true');
+    btn.onclick = e => { e.preventDefault(); document.getElementById('unsavedBanner').scrollIntoView({behavior:'smooth'}); };
+  } else {
+    btn.classList.remove('disabled');
+    btn.removeAttribute('aria-disabled');
+    btn.onclick = null;
+  }
+}
+
+document.getElementById('planForm').addEventListener('change', markUnsaved);
+document.getElementById('planForm').addEventListener('submit', () => {
+  buildHiddenInputs();
+  planSaved = true;
+});
+
+init();
+</script>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
+"""
     return render_template_string(tpl, plan=plan, plan_json=plan_json, task_rows=task_rows, msg=msg)
+
 
 
 def _background_run(plan: ClinicPlanSchema):
