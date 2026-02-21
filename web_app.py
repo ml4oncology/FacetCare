@@ -267,22 +267,272 @@ def setup_plan():
             msg = f"Plan generation failed: {e}"
 
     tpl = """
-    <html><body>
-      <h2>MedFlow Setup</h2>
-      <p><a href='{{ url_for("plan_page") }}'>Plan</a> | <a href='{{ url_for("results_page") }}'>Results</a></p>
-      {% if msg %}<p style='color:#b00;'>{{ msg }}</p>{% endif %}
-      <form method="post">
-        <p><b>Clinic description and goals</b></p>
-        <textarea name="clinic_description" rows="10" cols="120">{{ default_desc }}</textarea>
-        <p>
-          Default target condition (optional): <input name="default_target_condition" size="40" value="pancreatic cancer">
-          Horizon months (optional): <input name="default_horizon_months" size="6" value="12">
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>MedFlow — Clinic Setup</title>
+  <link
+    href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
+    rel="stylesheet"
+  />
+  <link
+    href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css"
+    rel="stylesheet"
+  />
+  <style>
+    body { background-color: #f0f4f8; font-family: 'Segoe UI', sans-serif; }
+    .brand-bar {
+      background: linear-gradient(90deg, #1a3c5e 0%, #2563a8 100%);
+      padding: 1.1rem 2rem;
+      color: white;
+    }
+    .brand-bar .brand-title {
+      font-size: 1.6rem;
+      font-weight: 700;
+      letter-spacing: 0.03em;
+    }
+    .brand-bar .brand-subtitle {
+      font-size: 0.88rem;
+      opacity: 0.82;
+      margin-top: 0.1rem;
+    }
+    .card-setup {
+      border: none;
+      border-radius: 12px;
+      box-shadow: 0 4px 24px rgba(30,60,100,0.10);
+    }
+    .section-label {
+      font-size: 0.78rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+      color: #6b7a8d;
+      margin-bottom: 0.3rem;
+    }
+    .field-hint {
+      font-size: 0.82rem;
+      color: #7a8898;
+      margin-top: 0.3rem;
+    }
+    .example-pill {
+      display: inline-block;
+      cursor: pointer;
+      background: #e8f0fb;
+      color: #1a4080;
+      border-radius: 20px;
+      padding: 0.25rem 0.75rem;
+      font-size: 0.8rem;
+      margin: 0.2rem 0.15rem 0.2rem 0;
+      border: 1px solid #c5d8f5;
+      transition: background 0.15s;
+    }
+    .example-pill:hover { background: #cfe0f7; }
+    .btn-generate {
+      background: linear-gradient(90deg, #1a3c5e, #2563a8);
+      color: white;
+      border: none;
+      border-radius: 8px;
+      padding: 0.65rem 2.2rem;
+      font-size: 1rem;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+    }
+    .btn-generate:hover { opacity: 0.9; color: white; }
+    .alert-info-soft {
+      background: #eaf2ff;
+      border: 1px solid #c5d8f5;
+      border-radius: 8px;
+      color: #1a3c5e;
+      font-size: 0.88rem;
+    }
+    .step-badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      background: #2563a8;
+      color: white;
+      border-radius: 50%;
+      width: 24px;
+      height: 24px;
+      font-size: 0.78rem;
+      font-weight: 700;
+      margin-right: 0.5rem;
+      flex-shrink: 0;
+    }
+  </style>
+</head>
+<body>
+
+<!-- Brand bar -->
+<div class="brand-bar d-flex align-items-center gap-3">
+  <i class="bi bi-heart-pulse-fill fs-3"></i>
+  <div>
+    <div class="brand-title">MedFlow</div>
+    <div class="brand-subtitle">AI-Assisted Clinical Risk Screening &amp; Workflow Orchestration</div>
+  </div>
+</div>
+
+<div class="container py-5" style="max-width:780px;">
+
+  <!-- How it works banner -->
+  <div class="alert alert-info-soft d-flex gap-2 align-items-start mb-4 px-4 py-3">
+    <i class="bi bi-info-circle-fill mt-1 flex-shrink-0" style="color:#2563a8;"></i>
+    <div>
+      <strong>How MedFlow works:</strong>
+      Describe your clinic's goals in plain language below. MedFlow will use AI to automatically
+      build a weekly screening plan, scan your patient roster's longitudinal notes, identify
+      patients at elevated risk, and generate clinician-ready summaries, referral packages,
+      and patient instructions — all for human review before any action is taken.
+    </div>
+  </div>
+
+  <!-- Error/message alert -->
+  {% if msg %}
+  <div class="alert alert-danger d-flex align-items-center gap-2 mb-4" role="alert">
+    <i class="bi bi-exclamation-triangle-fill"></i>
+    <div>{{ msg }}</div>
+  </div>
+  {% endif %}
+
+  <!-- Main card -->
+  <div class="card card-setup p-4 p-md-5">
+    <h2 class="fw-bold mb-1" style="color:#1a3c5e;">Configure Your Screening Workflow</h2>
+    <p class="text-muted mb-4" style="font-size:0.92rem;">
+      Fill in the fields below to generate a tailored screening plan for your clinic.
+      All fields except the description have sensible defaults — you can leave them blank
+      to accept MedFlow's recommendations.
+    </p>
+
+    <form method="POST" action="/setup">
+
+      <!-- Step 1: Clinic description -->
+      <div class="mb-4">
+        <div class="d-flex align-items-center mb-1">
+          <span class="step-badge">1</span>
+          <label class="fw-semibold fs-6 mb-0" for="clinic_description" style="color:#1a3c5e;">
+            Describe Your Clinic's Goals
+          </label>
+        </div>
+        <p class="field-hint mb-2">
+          Write a short description of your clinic type, the condition you want to screen for,
+          how often you'd like to review results, how many patients to shortlist each session,
+          and any constraints (e.g., no repeated patients within 30 days, decision support only).
+          Plain language is fine — MedFlow will interpret it.
         </p>
-        <button type="submit">Generate Plan</button>
-      </form>
-    </body></html>
-    """
+
+        <!-- Example pills -->
+        <div class="mb-2">
+          <span class="section-label">Quick examples — click to use:</span><br/>
+          <span class="example-pill" onclick="setExample('pancreatic')">🔬 Pancreatic cancer risk</span>
+          <span class="example-pill" onclick="setExample('colorectal')">🔬 Colorectal cancer risk</span>
+          <span class="example-pill" onclick="setExample('followup')">📋 Follow-up gaps &amp; safety-netting</span>
+          <span class="example-pill" onclick="setExample('referral')">📨 Referral quality &amp; triage</span>
+        </div>
+
+        <textarea
+          class="form-control"
+          id="clinic_description"
+          name="clinic_description"
+          rows="6"
+          placeholder="e.g. Family medicine clinic in rural Ontario. Weekly review of top 5 patients at risk of pancreatic cancer based on EMR notes. Do not repeat patients within 6 months. Generate referral-ready summaries and patient instructions. Decision support only — no diagnoses."
+          style="font-size:0.93rem; border-radius:8px;"
+        >{{ default_desc }}</textarea>
+        <div class="field-hint">
+          <i class="bi bi-lightbulb"></i>
+          Tip: Include your review cadence (e.g. "weekly"), how many patients (e.g. "top 5"),
+          deduplication window (e.g. "no repeats within 30 days"), and any guardrails
+          (e.g. "decision support only, no diagnosis").
+        </div>
+      </div>
+
+      <!-- Step 2: Optional overrides -->
+      <div class="mb-4">
+        <div class="d-flex align-items-center mb-1">
+          <span class="step-badge">2</span>
+          <label class="fw-semibold fs-6 mb-0" style="color:#1a3c5e;">
+            Optional: Screening Parameters
+          </label>
+        </div>
+        <p class="field-hint mb-3">
+          These override defaults extracted from your description above.
+          Leave blank to let MedFlow infer them automatically.
+        </p>
+        <div class="row g-3">
+          <div class="col-md-6">
+            <label class="form-label section-label" for="default_target_condition">
+              Target Condition
+            </label>
+            <input
+              type="text"
+              class="form-control"
+              id="default_target_condition"
+              name="default_target_condition"
+              placeholder="e.g. pancreatic_cancer, colorectal_cancer"
+              style="border-radius:8px;"
+            />
+            <div class="field-hint">
+              The specific cancer or condition to screen for. Use underscores, no spaces.
+            </div>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label section-label" for="default_horizon_months">
+              Risk Horizon (months)
+            </label>
+            <input
+              type="number"
+              class="form-control"
+              id="default_horizon_months"
+              name="default_horizon_months"
+              placeholder="e.g. 36"
+              min="1"
+              max="120"
+              style="border-radius:8px;"
+            />
+            <div class="field-hint">
+              Timeframe over which risk is assessed (1–120 months). Default: 36 months.
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Submit -->
+      <div class="d-grid mt-4">
+        <button type="submit" class="btn btn-generate btn-lg">
+          <i class="bi bi-cpu me-2"></i>Generate Screening Plan
+        </button>
+      </div>
+
+      <p class="text-center text-muted mt-3" style="font-size:0.82rem;">
+        MedFlow will analyse your description and build a structured plan.
+        You will be able to review and adjust it before any patients are screened.
+      </p>
+
+    </form>
+  </div>
+</div>
+
+<script>
+const examples = {
+  pancreatic: "Family medicine clinic in rural Ontario. Weekly clinician review, shortlist top 5 patients. Goal: identify patients at elevated risk of pancreatic cancer based on longitudinal EMR notes. Generate risk assessment, clinician chart summary, admin referral payload, and patient instructions. Do not repeat patients within 6 months. No diagnosis — decision support only.",
+  colorectal: "Community family practice. Monthly review of top 5 patients overdue for colorectal cancer screening or showing relevant risk factors in their notes. Generate clinician summaries and referral letters for patients at moderate or high risk. Decision support only.",
+  followup: "Family medicine clinic. Weekly review of patients with potential follow-up gaps: missed appointments, abnormal lab results not acted on, pending imaging. Generate follow-up gap reports and suggested care plan actions. No repeated patients within 30 days.",
+  referral: "Rural family practice. Weekly session to prioritize and triage referral queue. For each top-5 patient, generate a structured referral intake checklist and referral letter. Highlight semi-urgent and urgent cases. Decision support only."
+};
+
+function setExample(key) {
+  document.getElementById('clinic_description').value = examples[key];
+}
+</script>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
+"""
     return render_template_string(tpl, default_desc=default_desc, msg=msg)
+
+
 
 
 @app.route("/plan", methods=["GET", "POST"])
