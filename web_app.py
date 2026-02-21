@@ -19,9 +19,9 @@ from medflow.tasks import TaskContext, default_task_registry
 
 from openai import OpenAI
 
-ENDPOINT = "http://192.168.0.2:881/v1/"
+ENDPOINT = "http://node159:61424/v1"
 CLIENT = OpenAI(base_url=ENDPOINT, api_key="")
-MODEL = "gpt-4.1-mini"  # Replace with model name if needed.
+MODEL = "medgemma-1.5-4b-it"  # Replace with model name if needed.
 
 app = Flask(__name__)
 
