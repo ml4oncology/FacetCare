@@ -749,86 +749,167 @@ def plan_page():
 
     <!-- ── Section 1: Screening parameters ── -->
     <div class="card-panel p-4 mb-4">
-      <div class="d-flex align-items-center mb-3">
+    <div class="d-flex align-items-center mb-3">
         <span class="step-badge">1</span>
         <h5 class="fw-bold mb-0" style="color:#1a3c5e;">Screening Parameters</h5>
-      </div>
-      <p class="text-muted mb-3" style="font-size:0.88rem;">
-        These parameters control what condition is screened, over what time horizon, and how patients are scheduled for review.
+    </div>
+    <p class="text-muted mb-4" style="font-size:0.88rem;">
+        These parameters control what condition is screened, over what time horizon, and how
+        patients are scheduled and selected for review.
         Fields marked <span class="text-danger">*</span> are required.
-      </p>
+    </p>
 
-      <div class="row g-3">
-        <div class="col-md-6">
-          <label class="form-label section-label">Target Condition <span class="text-danger">*</span></label>
-          <input type="text" class="form-control tracked" name="target_condition"
+    <!-- Group A: Condition & horizon -->
+    <div class="mb-3">
+        <div class="section-label mb-2">🎯 Condition &amp; Horizon</div>
+        <div class="row g-3">
+        <div class="col-sm-6">
+            <label class="form-label section-label">Target Condition <span class="text-danger">*</span></label>
+            <input type="text" class="form-control tracked" name="target_condition"
             value="{{ plan.target_condition or '' }}"
             placeholder="e.g. pancreatic_cancer"
             style="border-radius:8px;"/>
-          <div class="field-hint">The cancer or clinical condition to screen for. Use underscores (e.g. <code>colorectal_cancer</code>).</div>
+            <div class="field-hint">The cancer or condition to screen for. Use underscores (e.g. <code>colorectal_cancer</code>).</div>
         </div>
-        <div class="col-md-3">
-          <label class="form-label section-label">Risk Horizon (months) <span class="text-danger">*</span></label>
-          <input type="number" class="form-control tracked" name="horizon_months"
+        <div class="col-sm-6">
+            <label class="form-label section-label">Risk Horizon (months) <span class="text-danger">*</span></label>
+            <input type="number" class="form-control tracked" name="horizon_months"
             value="{{ plan.horizon_months or '' }}"
             min="1" max="120" placeholder="e.g. 36"
             style="border-radius:8px;"/>
-          <div class="field-hint">Timeframe for risk assessment (1–120 months).</div>
+            <div class="field-hint">Timeframe over which risk is assessed (1–120 months).</div>
         </div>
-        <div class="col-md-3">
-          <label class="form-label section-label">Review Cadence <span class="text-danger">*</span></label>
-          <select class="form-select tracked" name="cadence" style="border-radius:8px;">
+        </div>
+    </div>
+
+    <hr class="my-3" style="border-color:#e0e8f0;"/>
+
+    <!-- Group B: Review schedule -->
+    <div class="mb-3">
+        <div class="section-label mb-2">📅 Review Schedule</div>
+        <div class="row g-3">
+        <div class="col-sm-4">
+            <label class="form-label section-label">Review Cadence <span class="text-danger">*</span></label>
+            <select class="form-select tracked" name="cadence" style="border-radius:8px;">
             {% for opt in ['daily','weekly','monthly','per_visit','yearly'] %}
             <option value="{{ opt }}" {% if plan.constraints.cadence == opt %}selected{% endif %}>
-              {{ opt|capitalize }}
+                {{ opt|capitalize }}
             </option>
             {% endfor %}
-          </select>
-          <div class="field-hint">How often the screening workflow runs.</div>
+            </select>
+            <div class="field-hint">How often the screening workflow runs.</div>
         </div>
-        <div class="col-md-3">
-          <label class="form-label section-label">Patients per Review <span class="text-danger">*</span></label>
-          <input type="number" class="form-control tracked" name="review_limit"
+        <div class="col-sm-4">
+            <label class="form-label section-label">Patients per Review <span class="text-danger">*</span></label>
+            <input type="number" class="form-control tracked" name="review_limit"
             value="{{ plan.constraints.review_limit }}"
-            min="1" max="200"
-            style="border-radius:8px;"/>
-          <div class="field-hint">Max patients shortlisted each session (e.g. 5).</div>
+            min="1" max="200" style="border-radius:8px;"/>
+            <div class="field-hint">Max patients shortlisted each session (e.g. 5).</div>
         </div>
-        <div class="col-md-3">
-          <label class="form-label section-label">Deduplication Window (days)</label>
-          <input type="number" class="form-control tracked" name="dedup_days"
+        <div class="col-sm-4">
+            <label class="form-label section-label">Deduplication Window (days)</label>
+            <input type="number" class="form-control tracked" name="dedup_days"
             value="{{ plan.constraints.dedup_days }}"
-            min="0"
-            style="border-radius:8px;"/>
-          <div class="field-hint">A patient reviewed within this many days will not be shortlisted again (0 = no limit).</div>
+            min="0" style="border-radius:8px;"/>
+            <div class="field-hint">A patient reviewed within this many days won't be shortlisted again. Set 0 for no limit.</div>
         </div>
-        <div class="col-md-3">
-          <label class="form-label section-label">Selection Method</label>
-          <select class="form-select tracked" name="selection_method" style="border-radius:8px;">
+        </div>
+    </div>
+
+    <hr class="my-3" style="border-color:#e0e8f0;"/>
+
+    <!-- Group C: Candidate pool -->
+    <div class="mb-3">
+        <div class="section-label mb-2">👥 Candidate Pool</div>
+        <div class="row g-3">
+        <div class="col-sm-4">
+            <label class="form-label section-label">Pool Strategy</label>
+            <select class="form-select tracked" name="candidate_pool_strategy" style="border-radius:8px;">
+            {% for opt in ['all','recent_notes_only','keyword_prefilter'] %}
+            <option value="{{ opt }}" {% if plan.constraints.candidate_pool.strategy == opt %}selected{% endif %}>
+                {{ opt.replace('_',' ')|title }}
+            </option>
+            {% endfor %}
+            </select>
+            <div class="field-hint">Which patients are eligible before scoring begins.</div>
+        </div>
+        <div class="col-sm-4">
+            <label class="form-label section-label">Max Candidates</label>
+            <input type="number" class="form-control tracked" name="max_candidates"
+            value="{{ plan.constraints.candidate_pool.max_candidates or '' }}"
+            min="1" max="5000" placeholder="e.g. 100 (blank = all)"
+            style="border-radius:8px;"/>
+            <div class="field-hint">Cap on how many patients enter the scoring pool. Leave blank to use all eligible patients.</div>
+        </div>
+        <div class="col-sm-4">
+            <label class="form-label section-label">Keyword Filter (CSV)</label>
+            <input type="text" class="form-control tracked" name="candidate_pool_keywords"
+            value="{{ plan.constraints.candidate_pool.keywords | join(', ') }}"
+            placeholder="e.g. weight loss, jaundice, fatigue"
+            style="border-radius:8px;"/>
+            <div class="field-hint">Only used when strategy is <em>Keyword Prefilter</em>. Comma-separated terms to match in notes.</div>
+        </div>
+        </div>
+    </div>
+
+    <hr class="my-3" style="border-color:#e0e8f0;"/>
+
+    <!-- Group D: Selection & risk thresholds -->
+    <div>
+        <div class="section-label mb-2">⚖️ Selection &amp; Risk Thresholds</div>
+        <div class="row g-3">
+        <div class="col-sm-4">
+            <label class="form-label section-label">Selection Method</label>
+            <select class="form-select tracked" name="selection_method" style="border-radius:8px;">
             {% for opt in ['top_k','threshold','threshold_then_top_k','first_k'] %}
             <option value="{{ opt }}" {% if plan.constraints.selection.method == opt %}selected{% endif %}>
-              {{ opt.replace('_',' ')|title }}
+                {{ opt.replace('_',' ')|title }}
             </option>
             {% endfor %}
-          </select>
-          <div class="field-hint">How patients are ranked and selected from the scored pool.</div>
+            </select>
+            <div class="field-hint">How patients are ranked and selected from the scored pool.</div>
         </div>
-        <div class="col-md-3">
-          <label class="form-label section-label">Risk Threshold — Low (&lt;)</label>
-          <input type="number" class="form-control tracked" name="risk_low_lt" step="0.01" min="0" max="1"
+        <div class="col-sm-4">
+            <label class="form-label section-label">Selection Source Task</label>
+            <input type="text" class="form-control tracked" name="selection_source_task"
+            value="{{ plan.constraints.selection.source_task or '' }}"
+            placeholder="e.g. risk_assessment"
+            style="border-radius:8px;"/>
+            <div class="field-hint">Which task's score drives patient selection. Leave blank for auto-detect.</div>
+        </div>
+        <div class="col-sm-4">
+            <label class="form-label section-label">Selection K</label>
+            <input type="number" class="form-control tracked" name="selection_k"
+            value="{{ plan.constraints.selection.k }}"
+            min="1" max="200" style="border-radius:8px;"/>
+            <div class="field-hint">Number of top-ranked patients to select (used by Top K methods).</div>
+        </div>
+        <div class="col-sm-4">
+            <label class="form-label section-label">Selection Threshold</label>
+            <input type="number" class="form-control tracked" name="selection_threshold" step="0.01" min="0" max="1"
+            value="{{ plan.constraints.selection.threshold or '' }}"
+            placeholder="e.g. 0.05 (blank = none)"
+            style="border-radius:8px;"/>
+            <div class="field-hint">Minimum score for a patient to be considered (0–1). Only used by threshold-based methods.</div>
+        </div>
+        <div class="col-sm-4">
+            <label class="form-label section-label">Risk Threshold — Low (&lt;)</label>
+            <input type="number" class="form-control tracked" name="risk_low_lt" step="0.01" min="0" max="1"
             value="{{ plan.constraints.risk_level_policy.low_lt }}"
             style="border-radius:8px;"/>
-          <div class="field-hint">Patients below this probability (0–1) are classified as <strong>low risk</strong>.</div>
+            <div class="field-hint">Patients below this probability are classified as <strong>low risk</strong>.</div>
         </div>
-        <div class="col-md-3">
-          <label class="form-label section-label">Risk Threshold — Moderate (&lt;)</label>
-          <input type="number" class="form-control tracked" name="risk_moderate_lt" step="0.01" min="0" max="1"
+        <div class="col-sm-4">
+            <label class="form-label section-label">Risk Threshold — Moderate (&lt;)</label>
+            <input type="number" class="form-control tracked" name="risk_moderate_lt" step="0.01" min="0" max="1"
             value="{{ plan.constraints.risk_level_policy.moderate_lt }}"
             style="border-radius:8px;"/>
-          <div class="field-hint">Patients between the low and this value are <strong>moderate risk</strong>; above is <strong>high risk</strong>.</div>
+            <div class="field-hint">Between low and this value = <strong>moderate risk</strong>. Above = <strong>high risk</strong>.</div>
         </div>
-      </div>
+        </div>
     </div>
+    </div>
+
 
     <!-- Hidden inputs for task state (populated by JS) -->
     <div id="taskHiddenInputs"></div>
@@ -906,14 +987,14 @@ const TASK_META = {
   "clinician_summary":          { icon: "bi-file-earmark-text", desc: "Produces a concise chart summary with suggested orders and referrals for the clinician." },
   "admin_referral":             { icon: "bi-send",              desc: "Generates a structured referral payload for administrative processing." },
   "patient_instructions":       { icon: "bi-person-lines-fill", desc: "Drafts plain-language instructions for the patient regarding next steps." },
-  "results_summary":            { icon: "bi-clipboard2-data",   desc: "Summarises lab, imaging, and trending data from the patient's notes." },
+  "results_summary":            { icon: "bi-clipboard2-data",   desc: "Summarizes lab, imaging, and trending data from the patient's notes." },
   "transcription":              { icon: "bi-mic",               desc: "Placeholder for audio transcription; passes notes through as-is in this demo." },
   "referral_letter":            { icon: "bi-envelope-paper",    desc: "Drafts a formal referral letter addressed to the receiving clinician or service." },
   "differential_diagnosis":     { icon: "bi-search",            desc: "Lists possible diagnoses with supporting reasoning from the clinical notes." },
   "guideline_comparison":       { icon: "bi-journals",          desc: "Compares the patient's situation against relevant clinical guidelines." },
   "followup_gap_detection":     { icon: "bi-calendar-x",        desc: "Identifies missed follow-ups, pending results, and care gaps in the notes." },
   "referral_intake_checklist":  { icon: "bi-card-checklist",    desc: "Produces a structured checklist for the receiving service's intake process." },
-  "lab_trend_summary":          { icon: "bi-activity",          desc: "Summarises lab value trends over time with clinician and patient-friendly narratives." },
+  "lab_trend_summary":          { icon: "bi-activity",          desc: "Summarizes lab value trends over time with clinician and patient-friendly narratives." },
   "care_plan_reconciliation":   { icon: "bi-arrow-repeat",      desc: "Compares prior care plan items against current notes to flag completed, changed, or unresolved items." }
 };
 
