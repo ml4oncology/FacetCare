@@ -37,7 +37,185 @@ current_results = None
 run_state: Dict[str, Any] = {"status": "idle", "message": "No run yet."}
 patients_cache: List[PatientRecord] = []
 reviewed_state_by_run: Dict[str, Dict[str, bool]] = {}
+_patient_chart_chat_history: Dict[str, List[Dict[str, str]]] = {}
 _task_output_cache = JSONTaskOutputCache(Path(__file__).resolve().parent / "task_output_cache.json")
+
+
+def _patient_chart_history_get(patient_id: str) -> List[Dict[str, str]]:
+    with _lock:
+        rows = _patient_chart_chat_history.get(str(patient_id), [])
+        # Return a shallow copy so template/render code cannot mutate shared state accidentally.
+        return [dict(r) for r in rows if isinstance(r, dict)]
+
+
+def _patient_chart_history_rows(patient_id: str) -> List[Dict[str, str]]:
+    """Flatten paired in-memory chat turns into template-friendly role/content rows."""
+    rows_out: List[Dict[str, str]] = []
+    for turn in _patient_chart_history_get(patient_id):
+        if not isinstance(turn, dict):
+            continue
+        user_msg = str(turn.get('user') or '').strip()
+        asst_msg = str(turn.get('assistant') or '').strip()
+        if user_msg:
+            rows_out.append({'role': 'user', 'content': user_msg})
+        if asst_msg:
+            rows_out.append({'role': 'assistant', 'content': asst_msg})
+    return rows_out
+
+def _patient_chart_history_text_export(patient_id: str) -> str:
+    """Render per-patient chart chat history to a readable plain-text transcript."""
+    rows = _patient_chart_history_get(patient_id)
+    if not rows:
+        return ''
+    out: List[str] = []
+    for i, turn in enumerate(rows, start=1):
+        if not isinstance(turn, dict):
+            continue
+        ts = str(turn.get('ts') or '').strip()
+        u = str(turn.get('user') or '').strip()
+        a = str(turn.get('assistant') or '').strip()
+        out.append(f'=== Turn {i}' + (f' ({ts})' if ts else '') + ' ===')
+        if u:
+            out.append('Clinician:')
+            out.append(u)
+        if a:
+            out.append('FacetCare:')
+            out.append(a)
+        out.append('')
+    return '\n'.join(out).strip() + '\n'
+
+
+def _patient_chart_history_clear(patient_id: str) -> None:
+    with _lock:
+        _patient_chart_chat_history.pop(str(patient_id), None)
+
+
+def _patient_chart_history_append(patient_id: str, user_message: str, assistant_message: str, max_turns: int = 8) -> None:
+    pid = str(patient_id)
+    user_message = (user_message or '').strip()
+    assistant_message = (assistant_message or '').strip()
+    if not user_message and not assistant_message:
+        return
+    with _lock:
+        rows = _patient_chart_chat_history.setdefault(pid, [])
+        rows.append({
+            'user': user_message,
+            'assistant': assistant_message,
+            'ts': dt.datetime.now().isoformat(timespec='seconds'),
+        })
+        # Keep a small in-memory history.
+        if len(rows) > max_turns:
+            del rows[:-max_turns]
+
+
+def _chart_chat_llm_answer(
+    patient_id: str,
+    user_message: str,
+    bundle: Dict[str, Any],
+    note_preview: str,
+    history: List[Dict[str, str]],
+) -> str:
+    """Small chart-chat helper using the local OpenAI-compatible endpoint."""
+    user_message = (user_message or '').strip()
+    if not user_message:
+        return 'Please enter a question.'
+
+    # Build a compact artifact summary for prompting.
+    bundle_copy = dict(bundle or {})
+    # Avoid duplicating the entire note twice in prompt payload.
+    bundle_copy.pop('source_note_preview', None)
+    bundle_copy.pop('note_preview', None)
+
+    try:
+        artifact_json = json.dumps(bundle_copy, ensure_ascii=False, indent=2)
+    except Exception:
+        artifact_json = str(bundle_copy)
+    if len(artifact_json) > 8000:
+        artifact_json = artifact_json[:8000] + '\n... [truncated]'
+
+    note_compact = (note_preview or '').strip()
+    if len(note_compact) > 6000:
+        note_compact = note_compact[:6000] + '\n... [truncated]'
+
+    recent_turns = []
+    for h in (history or [])[-6:]:
+        if not isinstance(h, dict):
+            continue
+        u = str(h.get('user', '') or '').strip()
+        a = str(h.get('assistant', '') or '').strip()
+        if u:
+            recent_turns.append({'role': 'user', 'content': u})
+        if a:
+            recent_turns.append({'role': 'assistant', 'content': a})
+
+    system_prompt = (
+        'You are a clinical chart assistant for a demo review UI. '
+        'Use only the provided source note and generated workflow outputs. '
+        'Do not invent facts. If something is missing or uncertain, say so clearly. '
+        'Give concise, clinically useful answers for a physician reviewing a chart. '
+        'Do not provide a diagnosis; provide chart-grounded observations, possible gaps, and suggested follow-up questions.'
+    )
+
+    messages = [
+        {'role': 'system', 'content': system_prompt},
+        {'role': 'user', 'content': (
+            f'Patient ID: {patient_id}\n\n'
+            f'Source note preview:\n{note_compact or "[none]"}\n\n'
+            f'Generated workflow outputs (JSON):\n{artifact_json}\n\n'
+            'Use this as chart context for future questions.'
+        )},
+    ]
+    messages.extend(recent_turns)
+    messages.append({'role': 'user', 'content': user_message})
+
+    # Try local OpenAI-compatible chat endpoint first.
+    try:
+        resp = CLIENT.chat.completions.create(
+            model=MODEL,
+            messages=messages,
+            temperature=0.2,
+        )
+        content = None
+        try:
+            content = resp.choices[0].message.content
+        except Exception:
+            content = None
+        if isinstance(content, list):
+            parts = []
+            for c in content:
+                if isinstance(c, dict):
+                    t = c.get('text') or c.get('content') or ''
+                    if t:
+                        parts.append(str(t))
+                else:
+                    parts.append(str(c))
+            content = '\n'.join([p for p in parts if p])
+        answer = (str(content or '')).strip()
+        if answer:
+            return answer
+    except Exception as e:
+        llm_err = e
+    else:
+        llm_err = None
+
+    # Graceful fallback if local model is unavailable.
+    # Keep it explicitly chart-grounded.
+    risk = bundle.get('risk') if isinstance(bundle, dict) else None
+    risk_line = ''
+    if isinstance(risk, dict):
+        rp = risk.get('risk_probability')
+        rl = risk.get('risk_level')
+        if rp is not None or rl:
+            risk_line = f'Risk output present: level={rl or "unknown"}, probability={rp if rp is not None else "n/a"}. '
+    note_excerpt = note_compact[:700] if note_compact else '[no source note available]'
+    err_msg = f'Chart chat fallback used because the model endpoint was unavailable ({llm_err}).' if llm_err else 'Chart chat fallback used because the model returned no text.'
+    return (
+        f'{err_msg} '
+        f'{risk_line}'
+        f'Your question was: "{user_message}". '
+        'I can still summarize the available chart context, but this answer is limited without the model. '
+        f'Note excerpt: {note_excerpt}'
+    )
 
 
 # Python-side task groupings used for adaptive plan UI and labels
@@ -2288,6 +2466,8 @@ def patient_review_page(patient_id: str) -> Any:
     patient_instructions_text = _extract_patient_instructions_text(bundle)
     referral_letter_text = _extract_referral_letter_text(bundle)
 
+    chart_chat_history = _patient_chart_history_rows(patient_id)
+
     patient_msg = (request.args.get("msg") or "").strip()
     patient_msg_level = (request.args.get("lvl") or "success").strip()
     if patient_msg_level not in {"success", "warning", "danger", "info"}:
@@ -2321,6 +2501,12 @@ def patient_review_page(patient_id: str) -> Any:
   .artifact-card + .artifact-card{margin-top:.75rem}
   .artifact-header{border-bottom:1px solid #edf2f8;margin:-1rem -1rem .75rem -1rem;padding:.9rem 1rem .75rem 1rem}
   .note-chat-disabled textarea{background:#f8fafc}
+  .chat-log{max-height:260px;overflow:auto;background:#fbfdff;border:1px solid #dce7f3;border-radius:12px;padding:.6rem}
+  .chat-msg + .chat-msg{margin-top:.45rem}
+  .chat-bubble{border-radius:10px;padding:.45rem .55rem;font-size:.88rem;white-space:pre-wrap}
+  .chat-msg.user .chat-bubble{background:#eef6ff;border:1px solid #d7e7fb}
+  .chat-msg.assistant .chat-bubble{background:#f8fafc;border:1px solid #e5edf7}
+  .chat-role{font-size:.72rem;color:#6b7a8d;text-transform:uppercase;letter-spacing:.04em;margin-bottom:.2rem}
 </style>
 </head>
 <body>
@@ -2365,22 +2551,15 @@ def patient_review_page(patient_id: str) -> Any:
       </div>
     </div>
 
-    <div class="d-flex gap-2 flex-wrap mt-2">
-      {% if risk and risk.risk_probability is not none %}
-      <span class="pill">
-        <span class="badge {{ _status_badge_class(risk.risk_level) }} me-2">{{ risk.risk_level or 'risk' }}</span>
-        Risk {{ '%.3f'|format(risk.risk_probability) }}
-      </span>
+    <div class="d-flex gap-2 flex-wrap mt-2 align-items-center">
+      <span class="pill">{% if reviewed_flag %}Reviewed{% else %}Needs review{% endif %}</span>
+      {% set generated_count = (task_actions | selectattr('generated') | list | length) %}
+      {% set total_task_count = (task_actions | length) %}
+      {% if total_task_count %}
+      <span class="pill">{{ generated_count }} / {{ total_task_count }} outputs available</span>
       {% endif %}
-      {% if queue %}
-      <span class="pill">
-        <span class="badge {{ _status_badge_class(queue.priority_level) }} me-2">{{ queue.priority_level or 'priority' }}</span>
-        {% if queue.priority_score is not none %}Priority {{ '%.2f'|format(queue.priority_score) }}{% else %}Queue prioritized{% endif %}
-      </span>
-      {% endif %}
-      <span class="pill">{% if reviewed_flag %}Reviewed{% else %}Pending review{% endif %}</span>
-      {% for row in task_actions[:4] %}
-      <span class="task-chip {% if row.generated %}done{% else %}todo{% endif %}">
+      {% for row in task_actions[:6] %}
+      <span class="task-chip {% if row.generated %}done{% else %}todo{% endif %}" title="{{ row.label }}">
         {% if row.generated %}<i class="bi bi-check2"></i>{% else %}<i class="bi bi-dot"></i>{% endif %}
         {{ row.label }}
       </span>
@@ -2392,44 +2571,6 @@ def patient_review_page(patient_id: str) -> Any:
     {% endif %}
   </div>
 
-  <div class="card-panel p-3 p-md-4 mb-3">
-    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
-      <div>
-        <div class="section-title">Task actions</div>
-        <div class="small-muted">Run or rerun any patient-level task and the page updates immediately.</div>
-      </div>
-      <div class="small-muted">{{ task_actions|length }} available task actions</div>
-    </div>
-    <form method="post" action="{{ url_for('patient_run_task_action', patient_id=patient_id) }}" class="row g-2 align-items-end">
-      <div class="col-md-6">
-        <label class="label mb-1">Task</label>
-        <select class="form-select form-select-sm" name="task_name" required>
-          {% for row in task_actions %}
-          <option value="{{ row.task_name }}">{{ row.label }} {% if row.generated %}(regenerate){% else %}(generate){% endif %}</option>
-          {% endfor %}
-        </select>
-      </div>
-      <div class="col-md-3">
-        <div class="form-check mt-4 pt-1">
-          <input class="form-check-input" type="checkbox" name="force_refresh" value="1" id="forceRefreshTask">
-          <label class="form-check-label small" for="forceRefreshTask">Force refresh</label>
-        </div>
-      </div>
-      <div class="col-md-3 d-flex justify-content-md-end">
-        <button class="btn btn-sm btn-primary mt-3 mt-md-0"><i class="bi bi-play-fill me-1"></i>Run Task</button>
-      </div>
-    </form>
-    <div class="d-flex gap-2 flex-wrap mt-2">
-      {% for row in task_actions[:6] %}
-      <form method="post" action="{{ url_for('patient_run_task_action', patient_id=patient_id) }}" class="d-inline">
-        <input type="hidden" name="task_name" value="{{ row.task_name }}">
-        <button class="btn btn-sm {% if row.generated %}btn-outline-secondary{% else %}btn-outline-primary{% endif %}">
-          {% if row.generated %}Regenerate{% else %}Generate{% endif %} {{ row.label }}
-        </button>
-      </form>
-      {% endfor %}
-    </div>
-  </div>
 
   <div class="row g-3">
     <div class="col-lg-8">
@@ -2451,7 +2592,7 @@ def patient_review_page(patient_id: str) -> Any:
       {% else %}
       <div class="card-panel p-3 p-md-4 mb-3">
         <div class="section-title">No generated outputs yet</div>
-        <div class="small-muted">Use the task actions above to generate clinician summaries, referrals, follow-up gap outputs, instructions, or other artifacts for this patient.</div>
+        <div class="small-muted">Use Workflow outputs in the sidebar to generate clinician summaries, referrals, follow-up gap outputs, instructions, or other artifacts for this patient.</div>
       </div>
       {% endif %}
 
@@ -2471,23 +2612,23 @@ def patient_review_page(patient_id: str) -> Any:
 
     <div class="col-lg-4">
       <div class="card-panel p-3 p-md-4 mb-3">
-        <div class="section-title mb-2">Task output status</div>
+        <div class="section-title mb-2">Workflow outputs</div>
         <div class="d-flex flex-column gap-2">
           {% for row in task_actions %}
           <div class="d-flex align-items-center justify-content-between gap-2 border rounded-3 px-2 py-2" style="border-color:#e3eaf4 !important;">
             <div class="small">
               <div class="fw-semibold">{{ row.label }}</div>
-              <div class="small-muted">{% if row.generated %}Output available{% else %}Not generated{% endif %}</div>
+              <div class="small-muted">{% if row.generated %}Available{% else %}Not run yet{% endif %}</div>
             </div>
             <div class="d-flex align-items-center gap-2">
               {% if row.generated %}
                 <span class="badge bg-success">Ready</span>
               {% else %}
-                <span class="badge bg-light text-dark border">Pending</span>
+                <span class="badge bg-light text-dark border">Not run</span>
               {% endif %}
               <form method="post" action="{{ url_for('patient_run_task_action', patient_id=patient_id) }}" class="d-inline">
                 <input type="hidden" name="task_name" value="{{ row.task_name }}">
-                <button class="btn btn-sm btn-outline-secondary">Run</button>
+                <button class="btn btn-sm btn-outline-secondary">{% if row.generated %}Refresh{% else %}Run{% endif %}</button>
               </form>
             </div>
           </div>
@@ -2496,34 +2637,33 @@ def patient_review_page(patient_id: str) -> Any:
       </div>
 
       <div class="card-panel p-3 p-md-4 mb-3">
-        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
-          <div class="section-title">Patient instructions handout</div>
-          {% if patient_instructions_text %}
-          <div class="d-flex gap-1">
-            <a class="btn btn-sm btn-outline-success" href="{{ url_for('download_patient_instructions', patient_id=patient_id) }}">Save</a>
-            <a class="btn btn-sm btn-outline-secondary" target="_blank" href="{{ url_for('print_patient_instructions', patient_id=patient_id) }}">Print</a>
-          </div>
-          {% endif %}
-        </div>
-        {% if patient_instructions_text %}
-          <div class="mono-pre">{{ patient_instructions_text }}</div>
-        {% else %}
-          <div class="small-muted">No patient instructions generated yet.</div>
-        {% endif %}
-      </div>
+        <div class="section-title mb-1">Chart chat</div>
+        <div class="small-muted mb-2">Ask brief questions about the source note and generated workflow outputs for this patient.</div>
 
-      <div class="card-panel p-3 p-md-4 mb-3">
-        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
-          <div class="section-title">Referral letter</div>
-          {% if referral_letter_text %}
-          <a class="btn btn-sm btn-outline-success" href="{{ url_for('download_referral_letter', patient_id=patient_id) }}">Save Letter</a>
-          {% endif %}
+        {% if chart_chat_history %}
+        <div class="chat-log mb-2">
+          {% for m in chart_chat_history %}
+          <div class="chat-msg {{ m.role }}">
+            <div class="chat-role">{{ 'Clinician' if (m.role or '') == 'user' else 'FacetCare' }}</div>
+            <div class="chat-bubble">{{ m.content }}</div>
+          </div>
+          {% endfor %}
         </div>
-        {% if referral_letter_text %}
-          <div class="mono-pre">{{ referral_letter_text }}</div>
         {% else %}
-          <div class="small-muted">No referral letter generated yet.</div>
+        <div class="small-muted border rounded-3 px-2 py-2 mb-2" style="border-color:#e3eaf4 !important;">No chat yet for this patient.</div>
         {% endif %}
+
+        <form method="post" action="{{ url_for('patient_chart_chat_action', patient_id=patient_id) }}">
+          <textarea class="form-control form-control-sm mb-2" rows="3" name="chat_message" placeholder="Ask a question about this patient note or the generated outputs..."></textarea>
+          <div class="d-flex gap-2 flex-wrap">
+            <button class="btn btn-sm btn-outline-primary" name="chat_action" value="ask">Ask</button>
+            {% if chart_chat_history %}
+            <button class="btn btn-sm btn-outline-secondary" name="chat_action" value="clear">Clear chat</button>
+            <a class="btn btn-sm btn-outline-success" href="{{ url_for('download_chart_chat_txt', patient_id=patient_id) }}">Save .txt</a>
+            <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('download_chart_chat_json', patient_id=patient_id) }}">Save JSON</a>
+            {% endif %}
+          </div>
+        </form>
       </div>
 
       <div class="card-panel p-3 p-md-4 mb-3">
@@ -2535,15 +2675,8 @@ def patient_review_page(patient_id: str) -> Any:
         {% endif %}
       </div>
 
-      <div class="card-panel p-3 p-md-4 mb-3 note-chat-disabled">
-        <div class="section-title mb-1">Chart chat (prototype)</div>
-        <div class="small-muted mb-2">UI placeholder only for now. Backend chat on a single patient note is not wired yet.</div>
-        <textarea class="form-control form-control-sm mb-2" rows="3" placeholder="Ask about this chart..." disabled></textarea>
-        <button class="btn btn-sm btn-outline-secondary" disabled>Ask</button>
-      </div>
-
       <div class="card-panel p-3 p-md-4">
-        <details open>
+        <details>
           <summary class="fw-semibold">Raw JSON</summary>
           <div class="mono-pre mt-2">{{ bundle | tojson(indent=2) }}</div>
         </details>
@@ -2654,8 +2787,9 @@ def patient_review_page(patient_id: str) -> Any:
   {{ render_list(items) }}
 
 {% elif sec.kind == "referral_letter" and sec.payload %}
-  <div class="d-flex justify-content-end mb-2">
+  <div class="d-flex justify-content-end align-items-center flex-wrap gap-1 mb-2">
     <a class="btn btn-sm btn-outline-success" href="{{ url_for('download_referral_letter', patient_id=patient_id) }}">Save letter</a>
+    <a class="btn btn-sm btn-outline-secondary" target="_blank" href="{{ url_for('print_referral_letter', patient_id=patient_id) }}">Print</a>
   </div>
   <div class="mono-pre">{{ sec.payload }}</div>
 
@@ -2730,6 +2864,7 @@ def patient_review_page(patient_id: str) -> Any:
         patient_msg_level=patient_msg_level,
         _status_badge_class=_status_badge_class,
         render_list=_jinja_render_list,
+        chart_chat_history=chart_chat_history,
     )
 
 
@@ -2747,6 +2882,93 @@ def patient_run_task_action(patient_id: str) -> Any:
         qp = urlencode({"msg": f"Ran {task_name} for {patient_id}.", "lvl": "success"})
     return redirect(f"{url_for('patient_review_page', patient_id=patient_id)}?{qp}")
 
+
+
+
+@app.post("/results/patient/<patient_id>/chart-chat")
+def patient_chart_chat_action(patient_id: str) -> Any:
+    action = (request.form.get("chat_action") or "ask").strip().lower()
+    if action == "clear":
+        _patient_chart_history_clear(patient_id)
+        qp = urlencode({"msg": "Chart chat cleared.", "lvl": "info"})
+        return redirect(f"{url_for('patient_review_page', patient_id=patient_id)}?{qp}")
+
+    user_message = (request.form.get("chat_message") or "").strip()
+    if not user_message:
+        qp = urlencode({"msg": "Enter a question for Chart chat.", "lvl": "warning"})
+        return redirect(f"{url_for('patient_review_page', patient_id=patient_id)}?{qp}")
+
+    _load_persisted_state()
+    with _lock:
+        results_obj = current_results
+    if results_obj is None:
+        qp = urlencode({"msg": "No results found. Run the workflow first.", "lvl": "warning"})
+        return redirect(f"{url_for('patient_review_page', patient_id=patient_id)}?{qp}")
+
+    _, bundle_obj = _find_selected_bundle_index(results_obj, patient_id)
+    if bundle_obj is None:
+        qp = urlencode({"msg": f"Patient {patient_id} was not found in current results.", "lvl": "warning"})
+        return redirect(f"/results?{qp}")
+
+    bundle = _jsonable(bundle_obj)
+    if not isinstance(bundle, dict):
+        bundle = {}
+    note_preview = (
+        bundle.get("source_note_preview")
+        or bundle.get("note_preview")
+        or _source_note_preview(patient_id)
+        or ""
+    )
+    history = _patient_chart_history_get(patient_id)
+
+    try:
+        answer = _chart_chat_llm_answer(
+            patient_id=patient_id,
+            user_message=user_message,
+            bundle=bundle,
+            note_preview=note_preview,
+            history=history,
+        )
+    except Exception as e:
+        qp = urlencode({"msg": f"Chart chat failed: {e}", "lvl": "danger"})
+        return redirect(f"{url_for('patient_review_page', patient_id=patient_id)}?{qp}")
+
+    _patient_chart_history_append(patient_id, user_message, answer)
+    qp = urlencode({"msg": "Chart chat updated.", "lvl": "success"})
+    return redirect(f"{url_for('patient_review_page', patient_id=patient_id)}?{qp}")
+
+
+
+@app.get("/results/patient/<patient_id>/chart-chat.txt")
+def download_chart_chat_txt(patient_id: str) -> Any:
+    rows = _patient_chart_history_get(patient_id)
+    if not rows:
+        qp = urlencode({"msg": "No chart chat history yet for this patient.", "lvl": "warning"})
+        return redirect(f"{url_for('patient_review_page', patient_id=patient_id)}?{qp}")
+    txt = _patient_chart_history_text_export(patient_id)
+    safe_pid = re.sub(r"[^A-Za-z0-9_-]+", "_", patient_id).strip("_") or "patient"
+    resp = make_response(txt)
+    resp.headers["Content-Type"] = "text/plain; charset=utf-8"
+    resp.headers["Content-Disposition"] = f'attachment; filename="chart_chat_{safe_pid}.txt"'
+    return resp
+
+
+@app.get("/results/patient/<patient_id>/chart-chat.json")
+def download_chart_chat_json(patient_id: str) -> Any:
+    rows = _patient_chart_history_get(patient_id)
+    if not rows:
+        qp = urlencode({"msg": "No chart chat history yet for this patient.", "lvl": "warning"})
+        return redirect(f"{url_for('patient_review_page', patient_id=patient_id)}?{qp}")
+    payload = {
+        "patient_id": patient_id,
+        "exported_at": dt.datetime.now().isoformat(timespec='seconds'),
+        "chat_turns": rows,
+    }
+    safe_pid = re.sub(r"[^A-Za-z0-9_-]+", "_", patient_id).strip("_") or "patient"
+    resp = make_response(json.dumps(payload, ensure_ascii=False, indent=2))
+    resp.headers["Content-Type"] = "application/json; charset=utf-8"
+    resp.headers["Content-Disposition"] = f'attachment; filename="chart_chat_{safe_pid}.json"'
+    return resp
 
 
 
@@ -2844,6 +3066,50 @@ def download_referral_letter(patient_id: str) -> Any:
     resp.headers["Content-Type"] = "text/plain; charset=utf-8"
     resp.headers["Content-Disposition"] = f'attachment; filename="referral_letter_{safe_pid}.txt"'
     return resp
+
+
+@app.get("/results/patient/<patient_id>/referral-letter/print")
+def print_referral_letter(patient_id: str) -> Any:
+    _load_persisted_state()
+    with _lock:
+        results_obj = current_results
+    if results_obj is None:
+        return redirect("/results")
+    _, bundle_obj = _find_selected_bundle_index(results_obj, patient_id)
+    if bundle_obj is None:
+        return redirect("/results")
+    bundle = _jsonable(bundle_obj)
+    if not isinstance(bundle, dict):
+        return redirect(url_for("patient_review_page", patient_id=patient_id))
+    txt = _extract_referral_letter_text(bundle)
+    if not txt:
+        qp = urlencode({"msg": "No referral letter generated yet.", "lvl": "warning"})
+        return redirect(f"{url_for('patient_review_page', patient_id=patient_id)}?{qp}")
+    body_html = '<br>'.join(escape(line) for line in str(txt).splitlines())
+    return f"""<!doctype html>
+<html lang='en'>
+<head>
+<meta charset='utf-8'>
+<meta name='viewport' content='width=device-width, initial-scale=1'>
+<title>Referral Letter · {escape(patient_id)}</title>
+<style>
+ body{{font-family:Segoe UI,Arial,sans-serif; margin:24px; color:#1f2937;}}
+ h1{{font-size:1.15rem; margin:0 0 6px 0;}}
+ .meta{{color:#6b7280; font-size:.9rem; margin-bottom:12px;}}
+ .box{{border:1px solid #d1d5db; border-radius:12px; padding:14px; white-space:normal; line-height:1.4;}}
+ @media print {{ .noprint{{display:none}} body{{margin:0.5in;}} }}
+</style>
+</head>
+<body>
+  <div class='noprint' style='margin-bottom:10px;'>
+    <button onclick='window.print()'>Print</button>
+    <button onclick='window.close()'>Close</button>
+  </div>
+  <h1>Referral Letter</h1>
+  <div class='meta'>Patient: {escape(patient_id)}</div>
+  <div class='box'>{body_html}</div>
+</body>
+</html>"""
 
 
 if __name__ == "__main__":
