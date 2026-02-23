@@ -9,6 +9,7 @@ import time
 from datetime import date
 from pathlib import Path
 from typing import Any, Dict, List, Optional
+import datetime as dt
 
 from flask import Flask, redirect, render_template_string, request, url_for, make_response
 
@@ -23,7 +24,7 @@ from openai import OpenAI
 
 ENDPOINT = "http://192.168.0.2:881/v1/"
 CLIENT = OpenAI(base_url=ENDPOINT, api_key="")
-MODEL = "gpt-4.1-mini"  # Replace with model name if needed.
+MODEL = "gpt-4.1-mini"  # Replace with your served llama.cpp model name if needed.
 
 app = Flask(__name__)
 
@@ -239,6 +240,28 @@ def _persist_state() -> None:
     with _lock:
         _persist_state_locked()
 
+
+
+def _jsonable(value):
+    """Recursively convert nested Pydantic models into JSON-safe Python values."""
+    if value is None or isinstance(value, (str, int, float, bool)):
+        return value
+    if isinstance(value, (dt.date, dt.datetime)):
+        return value.isoformat()
+    if isinstance(value, dict):
+        return {str(k): _jsonable(v) for k, v in value.items()}
+    if isinstance(value, (list, tuple, set)):
+        return [_jsonable(v) for v in value]
+    model_dump = getattr(value, "model_dump", None)
+    if callable(model_dump):
+        try:
+            return _jsonable(model_dump(mode="json"))
+        except TypeError:
+            return _jsonable(model_dump())
+    dict_fn = getattr(value, "dict", None)
+    if callable(dict_fn):
+        return _jsonable(dict_fn())
+    return str(value)
 
 def _load_persisted_state() -> None:
     global current_plan, current_results, run_state
@@ -1048,7 +1071,7 @@ def plan_page():
   </div>
 </div>
 <div class="container py-4" style="max-width:860px;">
-  <div class="unsaved-banner d-flex mb-3" id="unsavedBanner"><i class="bi bi-exclamation-triangle-fill"></i><span>You have unsaved changes. Please click <strong>Save Plan</strong> before running.</span></div>
+  <div class="unsaved-banner mb-3" id="unsavedBanner"><i class="bi bi-exclamation-triangle-fill"></i><span>You have unsaved changes. Please click <strong>Save Plan</strong> before running.</span></div>
   {% if msg %}
   <div class="alert {% if 'error' in msg.lower() or 'invalid' in msg.lower() or 'failed' in msg.lower() or 'validation' in msg.lower() %}alert-danger{% else %}alert-success{% endif %} d-flex align-items-center gap-2 mb-3"><i class="bi {% if 'error' in msg.lower() or 'invalid' in msg.lower() or 'failed' in msg.lower() or 'validation' in msg.lower() %}bi-exclamation-triangle-fill{% else %}bi-check-circle-fill{% endif %}"></i><div>{{ msg }}</div></div>
   {% endif %}
@@ -1134,7 +1157,7 @@ function injectAdvancedControls() {
   if (!mount) return;
   const cp = (CONSTRAINTS_PAYLOAD && CONSTRAINTS_PAYLOAD.candidate_pool) || {};
   const sel = (CONSTRAINTS_PAYLOAD && CONSTRAINTS_PAYLOAD.selection) || {};
-  const includeIds = Array.isArray(cp.include_patient_ids) ? cp.include_patient_ids.join('\n') : '';
+  const includeIds = Array.isArray(cp.include_patient_ids) ? cp.include_patient_ids.join('\\n') : '';
   mount.innerHTML = `
     <div class="card-panel p-4 mb-4">
       <div class="d-flex align-items-center justify-content-between gap-2 flex-wrap mb-2">
@@ -1470,6 +1493,7 @@ def _background_run(plan: ClinicPlanSchema):
 
 @app.route("/run")
 def run_plan():
+    global current_plan
     with _lock:
         plan = _ensure_plan_tasks_catalog(current_plan) if current_plan is not None else None
         if plan is not None and current_plan is not None and len(plan.tasks) != len(current_plan.tasks):
@@ -1604,6 +1628,8 @@ def results_page():
         if q and q not in b.patient_id.lower():
             continue
         filtered_bundles.append(b)
+
+    filtered_bundles = _jsonable(filtered_bundles)
 
     patient_lookup = {p.patient_id: p for p in load_sample_patients()}
 
