@@ -1,0 +1,153 @@
+{
+  "current_plan": {
+    "plan_version": "2.0",
+    "clinic_description": "Family medicine risk triage",
+    "target_condition": "pancreatic_cancer",
+    "horizon_months": 36,
+    "constraints": {
+      "cadence": "weekly",
+      "review_limit": 5,
+      "dedup_days": 30,
+      "candidate_pool": {
+        "strategy": "all",
+        "max_candidates": null,
+        "keywords": [],
+        "include_patient_ids": []
+      },
+      "selection": {
+        "source_task": "risk_assessment",
+        "method": "top_k",
+        "k": 5,
+        "threshold": null
+      },
+      "risk_level_policy": {
+        "low_lt": 0.1,
+        "moderate_lt": 0.2
+      }
+    },
+    "tasks": [
+      {
+        "name": "risk_assessment",
+        "enabled": true,
+        "params": {},
+        "depends_on": [
+          "intake_workflow"
+        ]
+      },
+      {
+        "name": "clinician_summary",
+        "enabled": false,
+        "params": {},
+        "depends_on": [
+          "intake_workflow"
+        ]
+      },
+      {
+        "name": "intake_workflow",
+        "enabled": false,
+        "params": {},
+        "depends_on": []
+      },
+      {
+        "name": "queue_prioritization",
+        "enabled": false,
+        "params": {},
+        "depends_on": [
+          "intake_workflow"
+        ]
+      },
+      {
+        "name": "admin_referral",
+        "enabled": false,
+        "params": {},
+        "depends_on": [
+          "intake_workflow"
+        ]
+      },
+      {
+        "name": "referral_letter",
+        "enabled": false,
+        "params": {},
+        "depends_on": [
+          "admin_referral"
+        ]
+      },
+      {
+        "name": "referral_intake_checklist",
+        "enabled": false,
+        "params": {},
+        "depends_on": [
+          "intake_workflow"
+        ]
+      },
+      {
+        "name": "followup_gap_detection",
+        "enabled": false,
+        "params": {},
+        "depends_on": [
+          "intake_workflow"
+        ]
+      },
+      {
+        "name": "lab_trend_summary",
+        "enabled": false,
+        "params": {},
+        "depends_on": [
+          "intake_workflow"
+        ]
+      },
+      {
+        "name": "care_plan_reconciliation",
+        "enabled": false,
+        "params": {},
+        "depends_on": [
+          "intake_workflow"
+        ]
+      },
+      {
+        "name": "patient_instructions",
+        "enabled": false,
+        "params": {},
+        "depends_on": [
+          "clinician_summary"
+        ]
+      },
+      {
+        "name": "results_summary",
+        "enabled": false,
+        "params": {},
+        "depends_on": [
+          "intake_workflow"
+        ]
+      },
+      {
+        "name": "transcription",
+        "enabled": false,
+        "params": {},
+        "depends_on": []
+      },
+      {
+        "name": "differential_diagnosis",
+        "enabled": false,
+        "params": {},
+        "depends_on": [
+          "clinician_summary"
+        ]
+      },
+      {
+        "name": "guideline_comparison",
+        "enabled": false,
+        "params": {},
+        "depends_on": [
+          "clinician_summary"
+        ]
+      }
+    ],
+    "workflow": null
+  },
+  "current_results": null,
+  "run_state": {
+    "status": "idle",
+    "message": "No run yet."
+  }
+}
