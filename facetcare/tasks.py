@@ -65,6 +65,24 @@ def _get_summary(state: Dict[str, Any], patient_id: str) -> Optional[ClinicianSu
     return s if isinstance(s, ClinicianSummarySchema) else None
 
 
+def _get_followup_gap(state: Dict[str, Any], patient_id: str) -> Optional[FollowupGapSchema]:
+    fbp = state.get("followup_gap_by_patient") or {}
+    f = fbp.get(patient_id)
+    return f if isinstance(f, FollowupGapSchema) else None
+
+
+def _get_guideline(state: Dict[str, Any], patient_id: str) -> Optional[GuidelineComparisonSchema]:
+    gbp = state.get("guideline_comparison_by_patient") or {}
+    g = gbp.get(patient_id)
+    return g if isinstance(g, GuidelineComparisonSchema) else None
+
+
+def _get_admin_referral(state: Dict[str, Any], patient_id: str) -> Optional[AdminReferralSchema]:
+    abp = state.get("admin_referral_by_patient") or {}
+    a = abp.get(patient_id)
+    return a if isinstance(a, AdminReferralSchema) else None
+
+
 class IntakeWorkflowTask(TaskBase):
     name = "intake_workflow"
 
@@ -128,6 +146,9 @@ class QueuePrioritizationTask(TaskBase):
 
     def run(self, *, ctx: TaskContext, plan: ClinicPlanSchema, patient: PatientRecord, state: Dict[str, Any], task_params: Optional[Dict[str, Any]] = None) -> QueuePrioritizationSchema:
         workflow = state.get("workflow")
+        risk = _get_risk(state, patient.patient_id)
+        summ = _get_summary(state, patient.patient_id)
+        gap = _get_followup_gap(state, patient.patient_id)
         target, horizon = _plan_target_and_horizon(plan, task_params)
         system, user = prompts.queue_prioritization_prompt(
             clinic_goals=plan.clinic_description,
@@ -136,6 +157,9 @@ class QueuePrioritizationTask(TaskBase):
             notes=patient.longitudinal_notes,
             target=target,
             horizon=horizon,
+            risk_json=risk.model_dump_json(indent=2) if risk else "none",
+            summary_json=summ.model_dump_json(indent=2) if summ else "none",
+            followup_gap_json=gap.model_dump_json(indent=2) if gap else "none",
         )
         obj = ctx.llm.json_object_no_tools(system=system, user=user, temperature=0.0)
         score = coerce_probability(obj.get("priority_score"), default=0.25)
@@ -181,6 +205,7 @@ class AdminReferralTask(TaskBase):
     def run(self, *, ctx: TaskContext, plan: ClinicPlanSchema, patient: PatientRecord, state: Dict[str, Any], task_params: Optional[Dict[str, Any]] = None) -> AdminReferralSchema:
         risk = _get_risk(state, patient.patient_id)
         summ = _get_summary(state, patient.patient_id)
+        guideline = _get_guideline(state, patient.patient_id)
         target, _ = _plan_target_and_horizon(plan, task_params)
         if risk is not None:
             target = risk.target_condition
@@ -203,6 +228,7 @@ class AdminReferralTask(TaskBase):
             destination=dest,
             risk_json=risk.model_dump_json(indent=2) if risk else "none",
             summary_json=summ.model_dump_json(indent=2) if summ else "none",
+            guideline_json=guideline.model_dump_json(indent=2) if guideline else "none",
             notes=patient.longitudinal_notes,
         )
         obj = ctx.llm.json_object_no_tools(system=system, user=user, temperature=0.0)
@@ -225,6 +251,8 @@ class PatientInstructionsTask(TaskBase):
     def run(self, *, ctx: TaskContext, plan: ClinicPlanSchema, patient: PatientRecord, state: Dict[str, Any], task_params: Optional[Dict[str, Any]] = None) -> PatientInstructionsSchema:
         risk = _get_risk(state, patient.patient_id)
         summ = _get_summary(state, patient.patient_id)
+        gap = _get_followup_gap(state, patient.patient_id)
+        admin_ref = _get_admin_referral(state, patient.patient_id)
         target, horizon = _plan_target_and_horizon(plan, task_params)
         if risk:
             target, horizon = risk.target_condition, risk.horizon_months
@@ -234,6 +262,8 @@ class PatientInstructionsTask(TaskBase):
             horizon=horizon,
             summary_json=summ.model_dump_json(indent=2) if summ else "none",
             risk_json=risk.model_dump_json(indent=2) if risk else "none",
+            followup_gap_json=gap.model_dump_json(indent=2) if gap else "none",
+            admin_referral_json=admin_ref.model_dump_json(indent=2) if admin_ref else "none",
             notes=patient.longitudinal_notes,
         )
         obj = ctx.llm.json_object_no_tools(system=system, user=user, temperature=0.0)
@@ -241,7 +271,9 @@ class PatientInstructionsTask(TaskBase):
             "Follow the clinic's recommended follow-up timeline.",
             "Seek urgent care if red-flag symptoms occur or worsen.",
         ]
-        return PatientInstructionsSchema(patient_id=patient.patient_id, target_condition=target, horizon_months=horizon, instructions=instructions)
+        out = PatientInstructionsSchema(patient_id=patient.patient_id, target_condition=target, horizon_months=horizon, instructions=instructions)
+        state.setdefault("patient_instructions_by_patient", {})[patient.patient_id] = out
+        return out
 
 
 class ResultsSummaryTask(TaskBase):
@@ -327,30 +359,40 @@ class GuidelineComparisonTask(TaskBase):
 
     def run(self, *, ctx: TaskContext, plan: ClinicPlanSchema, patient: PatientRecord, state: Dict[str, Any], task_params: Optional[Dict[str, Any]] = None) -> GuidelineComparisonSchema:
         target, horizon = _plan_target_and_horizon(plan, task_params)
+        risk = _get_risk(state, patient.patient_id)
+        summ = _get_summary(state, patient.patient_id)
         system, user = prompts.guideline_comparison_prompt(
             patient_id=patient.patient_id,
             target=target,
             horizon=horizon,
             notes=patient.longitudinal_notes,
+            risk_json=risk.model_dump_json(indent=2) if risk else "none",
+            summary_json=summ.model_dump_json(indent=2) if summ else "none",
         )
         obj = ctx.llm.json_object_no_tools(system=system, user=user, temperature=0.0)
-        return GuidelineComparisonSchema(
+        out = GuidelineComparisonSchema(
             patient_id=patient.patient_id,
             target_condition=target,
             horizon_months=horizon,
             recommended_guidelines=ensure_list_str(obj.get("recommended_guidelines") or ["Use local clinic and specialty pathway guidelines"]),
             evidence_summary=first_non_empty(obj.get("evidence_summary"), default="Guideline mapping requires clinician confirmation."),
         )
+        state.setdefault("guideline_comparison_by_patient", {})[patient.patient_id] = out
+        return out
 
 
 class FollowupGapDetectionTask(TaskBase):
     name = "followup_gap_detection"
 
     def run(self, *, ctx: TaskContext, plan: ClinicPlanSchema, patient: PatientRecord, state: Dict[str, Any], task_params: Optional[Dict[str, Any]] = None) -> FollowupGapSchema:
+        summ = _get_summary(state, patient.patient_id)
+        risk = _get_risk(state, patient.patient_id)
         system, user = prompts.followup_gap_prompt(
             clinic_goals=plan.clinic_description,
             patient_id=patient.patient_id,
             notes=patient.longitudinal_notes,
+            summary_json=summ.model_dump_json(indent=2) if summ else "none",
+            risk_json=risk.model_dump_json(indent=2) if risk else "none",
         )
         obj = ctx.llm.json_object_no_tools(system=system, user=user, temperature=0.0)
         sev = first_non_empty(obj.get("gap_severity"), default="moderate")
@@ -374,10 +416,13 @@ class ReferralIntakeChecklistTask(TaskBase):
         workflow = state.get("workflow")
         default_dest = workflow.referral_pathway.external if isinstance(workflow, ClinicWorkflowSchema) else "Specialty clinic"
         dest = first_non_empty((task_params or {}).get("destination_service"), default=default_dest)
+        admin_ref = state.get("admin_referral_by_patient", {}).get(patient.patient_id)
         system, user = prompts.referral_intake_checklist_prompt(
             destination=dest,
             patient_id=patient.patient_id,
             notes=patient.longitudinal_notes,
+            admin_referral_json=admin_ref.model_dump_json(indent=2) if isinstance(admin_ref, AdminReferralSchema) else "none",
+            workflow_json=workflow.model_dump_json(indent=2) if isinstance(workflow, ClinicWorkflowSchema) else "none",
         )
         obj = ctx.llm.json_object_no_tools(system=system, user=user, temperature=0.0)
         triage = first_non_empty(obj.get("triage_bucket"), default="routine")
