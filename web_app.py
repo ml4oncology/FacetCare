@@ -10,8 +10,10 @@ import time
 from datetime import date
 from pathlib import Path
 from typing import Any, Dict, List, Optional
+from urllib.parse import urlencode
 
 from flask import Flask, redirect, render_template_string, request, url_for, make_response
+from markupsafe import Markup, escape
 
 from facetcare.llm_client import LLMJsonClient
 from facetcare.plan_builder import TASK_CATALOG, build_clinic_plan_from_description
@@ -353,7 +355,9 @@ def _load_persisted_state() -> None:
         try:
             loaded_results = ReviewBundleSchema.model_validate(cr)
         except Exception:
-            loaded_results = None
+            # Keep dict-backed results if the persisted payload contains newer/extra fields.
+            # Patient and results pages handle both dict and Pydantic-backed shapes.
+            loaded_results = cr
 
     loaded_status = None
     if isinstance(rs, dict):
@@ -1247,7 +1251,7 @@ function injectAdvancedControls() {
     <div class="card-panel p-4 mb-4">
       <div class="d-flex align-items-center justify-content-between gap-2 flex-wrap mb-2">
         <div class="d-flex align-items-center">
-          <span class="step-badge">3</span>
+          <span class="step-badge">2</span>
           <h5 class="fw-bold mb-0" style="color:#1a3c5e;">Advanced Workflow Controls</h5>
         </div>
         <button class="btn btn-sm btn-outline-primary" type="button" data-bs-toggle="collapse" data-bs-target="#planAdvancedCollapse" aria-expanded="false" aria-controls="planAdvancedCollapse">
@@ -1723,6 +1727,8 @@ def results_page():
         filtered_bundles.append(b)
 
     filtered_bundles = _jsonable(filtered_bundles)
+    show_risk_col = any(bool((b or {}).get('risk')) for b in (filtered_bundles or []))
+    show_priority_col = any(bool(((b or {}).get('extra_outputs') or {}).get('queue_prioritization')) for b in (filtered_bundles or []))
 
     patient_lookup = {p.patient_id: p for p in load_sample_patients()}
 
@@ -1870,9 +1876,9 @@ def results_page():
               <th style=\"width:36px;\"><input type=\"checkbox\" class=\"form-check-input\" onclick=\"toggleAllRows(this.checked)\"/></th>
               <th>Patient</th>
               <th>Reviewed</th>
-              <th>Risk</th>
+              {% if show_risk_col %}<th>Risk</th>{% endif %}
+              {% if show_priority_col %}<th>Priority</th>{% endif %}
               <th>Artifacts</th>
-              <th>Priority</th>
               <th>Review</th>
             </tr>
           </thead>
@@ -1893,6 +1899,7 @@ def results_page():
                   <span class=\"badge bg-warning text-dark\">Pending</span>
                 {% endif %}
               </td>
+              {% if show_risk_col %}
               <td>
                 {% if b.risk %}
                   <div><span class=\"badge {% if (b.risk.risk_level or '').lower() == 'high' %}bg-danger{% elif (b.risk.risk_level or '').lower() == 'moderate' %}bg-warning text-dark{% else %}bg-secondary{% endif %}\">{{ b.risk.risk_level }}</span></div>
@@ -1901,15 +1908,18 @@ def results_page():
                   <span class=\"badge bg-light text-dark border\">Not scored</span>
                 {% endif %}
               </td>
+              {% endif %}
+              {% if show_priority_col %}
               <td>
                 {% set q = (b.extra_outputs.queue_prioritization if b.extra_outputs else None) %}
                 {% if q %}
-                  <div class="small fw-semibold text-capitalize">{{ q.priority_level or 'n/a' }}</div>
-                  <div class="small-muted">{% if q.priority_score is not none %}{{ '%.2f'|format(q.priority_score) }}{% else %}N/A{% endif %}</div>
+                  <div><span class=\"badge {% if (q.priority_level or '').lower() == 'high' %}bg-danger{% elif (q.priority_level or '').lower() == 'moderate' %}bg-warning text-dark{% else %}bg-secondary{% endif %}\">{{ q.priority_level or 'n/a' }}</span></div>
+                  <div class=\"small-muted\">{% if q.priority_score is not none %}{{ '%.2f'|format(q.priority_score) }}{% else %}N/A{% endif %}</div>
                 {% else %}
-                  <span class="badge bg-light text-dark border">None</span>
+                  <span class=\"badge bg-light text-dark border\">None</span>
                 {% endif %}
               </td>
+              {% endif %}
               <td>
                 {% for label, key in [('Risk','risk'),('Summary','clinician_summary'),('Referral','admin_referral'),('Letter','referral_letter'),('Instructions','patient_instructions')] %}
                   <span class=\"artifact-pill {% if flags.get(key) %}done{% endif %}\">{{ label }}</span>
@@ -1920,7 +1930,7 @@ def results_page():
               </td>
             </tr>
             {% else %}
-            <tr><td colspan=\"7\" class=\"text-center text-muted py-3\">No patients match the current filter.</td></tr>
+            <tr><td colspan=\"{{ 5 + (1 if show_risk_col else 0) + (1 if show_priority_col else 0) }}\" class=\"text-center text-muted py-3\">No patients match the current filter.</td></tr>
             {% endfor %}
           </tbody>
         </table>
@@ -1974,6 +1984,8 @@ function toggleAllRows(flag) {
             reviewed_map=reviewed_map,
             reviewed_count=reviewed_count,
             filtered_bundles=filtered_bundles,
+            show_risk_col=show_risk_col,
+            show_priority_col=show_priority_col,
             patient_lookup=patient_lookup,
             view_mode=view_mode,
             cache_stats=cache_stats,
@@ -2003,20 +2015,26 @@ def _find_selected_bundle_index(results_obj: Any, patient_id: str) -> tuple[int,
     return -1, None
 
 
+
 def _source_note_preview(patient_id: str, max_chars: int = 5000) -> str:
     global patients_cache
     try:
         if not patients_cache:
-            patients_cache = _load_patients()
+            patients_cache = load_sample_patients()
         for p in patients_cache or []:
-            if str(getattr(p, "patient_id", "")) == str(patient_id):
-                note_txt = getattr(p, "longitudinal_notes", None)
-                if not note_txt:
-                    note_txt = getattr(p, "notes_text", "")
-                return _truncate_text(str(note_txt or ""), max_chars)
+            p_pid = getattr(p, "patient_id", None)
+            if p_pid is None and isinstance(p, dict):
+                p_pid = p.get("patient_id")
+            if str(p_pid or "") != str(patient_id):
+                continue
+            note_txt = getattr(p, "longitudinal_notes", None)
+            if not note_txt and isinstance(p, dict):
+                note_txt = p.get("longitudinal_notes") or p.get("notes_text")
+            return _truncate_text(str(note_txt or ""), max_chars)
     except Exception:
         return ""
     return ""
+
 
 
 def _extract_referral_letter_text(bundle_dict: dict[str, Any]) -> str:
@@ -2037,6 +2055,200 @@ def _extract_referral_letter_text(bundle_dict: dict[str, Any]) -> str:
     return json.dumps(letter, indent=2, ensure_ascii=False)
 
 
+def _extract_patient_instructions_text(bundle_dict: dict[str, Any]) -> str:
+    extra = bundle_dict.get("extra_outputs") or {}
+    inst = extra.get("patient_instructions")
+    if inst is None:
+        return ""
+    inst = _jsonable(inst)
+    if isinstance(inst, dict):
+        lines = inst.get("instructions")
+        if isinstance(lines, list):
+            clean = [str(x).strip() for x in lines if str(x).strip()]
+            return "\n".join(f"{i+1}. {x}" for i, x in enumerate(clean))
+        for key in ("text", "content", "body"):
+            v = inst.get(key)
+            if isinstance(v, str) and v.strip():
+                return v
+    if isinstance(inst, list):
+        clean = [str(x).strip() for x in inst if str(x).strip()]
+        return "\n".join(f"{i+1}. {x}" for i, x in enumerate(clean))
+    if isinstance(inst, str):
+        return inst
+    return json.dumps(inst, indent=2, ensure_ascii=False)
+
+
+def _task_label(task_name: str) -> str:
+    return str(task_name or "").replace("_", " ").strip().title() or "Task"
+
+
+def _bundle_task_has_output(bundle_dict: dict[str, Any], task_name: str) -> bool:
+    if not isinstance(bundle_dict, dict):
+        return False
+    if task_name == "risk_assessment":
+        return bool(bundle_dict.get("risk"))
+    if task_name == "clinician_summary":
+        return bool(bundle_dict.get("clinician_summary"))
+    if task_name == "admin_referral":
+        return bool(bundle_dict.get("admin_referral"))
+    extra = bundle_dict.get("extra_outputs") or {}
+    return task_name in extra and extra.get(task_name) is not None
+
+
+def _bundle_task_output(bundle_dict: dict[str, Any], task_name: str) -> Any:
+    if task_name == "risk_assessment":
+        return bundle_dict.get("risk")
+    if task_name == "clinician_summary":
+        return bundle_dict.get("clinician_summary")
+    if task_name == "admin_referral":
+        return bundle_dict.get("admin_referral")
+    return (bundle_dict.get("extra_outputs") or {}).get(task_name)
+
+
+def _ordered_patient_task_actions(bundle_dict: dict[str, Any]) -> List[dict[str, Any]]:
+    global current_plan
+    ordered: List[str] = []
+    seen: set[str] = set()
+    plan_obj = None
+    try:
+        with _lock:
+            plan_obj = current_plan
+        if isinstance(plan_obj, dict):
+            plan_obj = _ensure_plan_tasks_catalog(ClinicPlanSchema.model_validate(plan_obj))
+    except Exception:
+        plan_obj = None
+
+    if plan_obj is not None:
+        for t in (getattr(plan_obj, "tasks", None) or []):
+            t_name = str(getattr(t, "name", "") or "")
+            if not t_name or t_name == "intake_workflow" or not bool(getattr(t, "enabled", True)):
+                continue
+            if t_name in seen:
+                continue
+            seen.add(t_name)
+            ordered.append(t_name)
+
+    # Always expose common patient-level actions if they are implemented, even if omitted in plan.
+    for t_name in [
+        "risk_assessment",
+        "queue_prioritization",
+        "clinician_summary",
+        "admin_referral",
+        "referral_letter",
+        "patient_instructions",
+        "followup_gap_detection",
+        "lab_trend_summary",
+        "referral_intake_checklist",
+        "care_plan_reconciliation",
+        "results_summary",
+        "differential_diagnosis",
+        "guideline_comparison",
+    ]:
+        if t_name not in seen:
+            seen.add(t_name)
+            ordered.append(t_name)
+
+    runner_registry = set()
+    try:
+        runner_registry = set(_make_runner().task_registry.keys())
+    except Exception:
+        runner_registry = set()
+
+    actions: List[dict[str, Any]] = []
+    for t_name in ordered:
+        if runner_registry and t_name not in runner_registry:
+            continue
+        actions.append(
+            {
+                "task_name": t_name,
+                "label": _task_label(t_name),
+                "generated": _bundle_task_has_output(bundle_dict, t_name),
+            }
+        )
+    return actions
+
+
+def _build_patient_sections(bundle_dict: dict[str, Any], task_actions: List[dict[str, Any]]) -> List[dict[str, Any]]:
+    present: List[str] = []
+    seen: set[str] = set()
+    # Prefer currently configured task order first
+    for row in task_actions or []:
+        t_name = str((row or {}).get("task_name", ""))
+        if t_name and _bundle_task_has_output(bundle_dict, t_name) and t_name not in seen:
+            present.append(t_name)
+            seen.add(t_name)
+    # Add any persisted outputs that may not be in the action list
+    extras = (bundle_dict.get("extra_outputs") or {}) if isinstance(bundle_dict, dict) else {}
+    for t_name in ["risk_assessment", "clinician_summary", "admin_referral"]:
+        if _bundle_task_has_output(bundle_dict, t_name) and t_name not in seen:
+            present.append(t_name)
+            seen.add(t_name)
+    for t_name in extras.keys():
+        if t_name not in seen and _bundle_task_has_output(bundle_dict, str(t_name)):
+            present.append(str(t_name))
+            seen.add(str(t_name))
+
+    sections: List[dict[str, Any]] = []
+    for t_name in present:
+        payload = _jsonable(_bundle_task_output(bundle_dict, t_name))
+        if payload is None:
+            continue
+        title = _task_label(t_name)
+        kind = t_name if t_name in {
+            "risk_assessment",
+            "clinician_summary",
+            "admin_referral",
+            "queue_prioritization",
+            "patient_instructions",
+            "referral_letter",
+            "followup_gap_detection",
+            "lab_trend_summary",
+            "referral_intake_checklist",
+            "results_summary",
+            "differential_diagnosis",
+            "guideline_comparison",
+            "care_plan_reconciliation",
+        } else "generic"
+        if t_name == "referral_letter":
+            payload = _extract_referral_letter_text(bundle_dict)
+        sections.append(
+            {
+                "task_name": t_name,
+                "title": title,
+                "kind": kind,
+                "payload": payload,
+                "json_text": json.dumps(_jsonable(_bundle_task_output(bundle_dict, t_name)), indent=2, ensure_ascii=False),
+            }
+        )
+    return sections
+
+
+def _status_badge_class(level: str | None) -> str:
+    lvl = str(level or "").lower().strip()
+    if lvl in {"high", "urgent"}:
+        return "bg-danger"
+    if lvl in {"moderate", "semi-urgent"}:
+        return "bg-warning text-dark"
+    if lvl in {"low", "routine"}:
+        return "bg-secondary"
+    return "bg-light text-dark border"
+
+
+
+def _jinja_render_list(items: Any) -> Markup:
+    try:
+        seq = list(items or [])
+    except Exception:
+        seq = []
+    if not seq:
+        return Markup('<div class="small-muted">None</div>')
+    lis = ''.join(f'<li>{escape(x)}</li>' for x in seq)
+    return Markup(f'<ul class="mb-0">{lis}</ul>')
+
+
+
+
+
 @app.route("/results/patient/<patient_id>")
 def patient_review_page(patient_id: str) -> Any:
     global current_results
@@ -2044,17 +2256,8 @@ def patient_review_page(patient_id: str) -> Any:
     with _lock:
         results_obj = current_results
 
-    if isinstance(results_obj, dict):
-        try:
-            normalized = ReviewBundleSchema.model_validate(results_obj)
-            with _lock:
-                current_results = normalized
-            results_obj = normalized
-        except Exception:
-            pass
-
     if results_obj is None:
-        return redirect("/run")
+        return redirect("/results")
 
     idx, bundle_obj = _find_selected_bundle_index(results_obj, patient_id)
     if bundle_obj is None:
@@ -2069,19 +2272,33 @@ def patient_review_page(patient_id: str) -> Any:
     if not isinstance(bundle, dict):
         bundle = {}
     extra = bundle.get("extra_outputs") or {}
-    risk = bundle.get("risk") or {}
-    clinician = bundle.get("clinician_summary") or {}
-    admin_referral = bundle.get("admin_referral") or {}
-    queue = extra.get("queue_prioritization") or {}
-    patient_instructions = extra.get("patient_instructions") or {}
-    referral_letter_text = _extract_referral_letter_text(bundle)
-    note_preview = _source_note_preview(patient_id)
-    reviewed_map = _review_map_for_results(results_obj)
+    risk = _jsonable(bundle.get("risk") or {}) or {}
+    queue = _jsonable(extra.get("queue_prioritization") or {}) or {}
+    reviewed_flag = _is_reviewed_patient(results_obj, patient_id)
 
-    tpl = """
+    note_preview = (
+        bundle.get("source_note_preview")
+        or bundle.get("note_preview")
+        or _source_note_preview(patient_id)
+    )
+    task_actions = _ordered_patient_task_actions(bundle)
+    sections = _build_patient_sections(bundle, task_actions)
+    primary_section = sections[0] if sections else None
+    other_sections = sections[1:] if len(sections) > 1 else []
+    patient_instructions_text = _extract_patient_instructions_text(bundle)
+    referral_letter_text = _extract_referral_letter_text(bundle)
+
+    patient_msg = (request.args.get("msg") or "").strip()
+    patient_msg_level = (request.args.get("lvl") or "success").strip()
+    if patient_msg_level not in {"success", "warning", "danger", "info"}:
+        patient_msg_level = "info"
+
+    tpl = '''
 <!doctype html>
-<html lang="en"><head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>FacetCare · Patient Review</title>
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
 <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet"/>
@@ -2092,68 +2309,404 @@ def patient_review_page(patient_id: str) -> Any:
   .brand-title-link:hover{color:white;opacity:.95}
   .brand-subtitle{font-size:.88rem;opacity:.85}
   .card-panel{background:#fff;border:1px solid #dce7f3;border-radius:16px;box-shadow:0 6px 18px rgba(12,34,56,.06)}
-  .small-muted{font-size:.82rem;color:#6b7a8d}.section-title{font-weight:700;color:#17324d}.label{font-size:.72rem;text-transform:uppercase;color:#6b7a8d;letter-spacing:.04em}
-  .mono-pre{white-space:pre-wrap;background:#fbfdff;border:1px solid #dce7f3;border-radius:10px;padding:.75rem;max-height:320px;overflow:auto;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:.82rem}
-  .pill{display:inline-flex;border:1px solid #dce7f3;background:#f7fbff;border-radius:999px;padding:.2rem .55rem;font-size:.75rem}
+  .small-muted{font-size:.82rem;color:#6b7a8d}
+  .section-title{font-weight:700;color:#17324d}
+  .label{font-size:.72rem;text-transform:uppercase;color:#6b7a8d;letter-spacing:.04em}
+  .mono-pre{white-space:pre-wrap;background:#fbfdff;border:1px solid #dce7f3;border-radius:10px;padding:.75rem;max-height:340px;overflow:auto;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:.82rem}
+  .pill{display:inline-flex;align-items:center;border:1px solid #dce7f3;background:#f7fbff;border-radius:999px;padding:.2rem .55rem;font-size:.75rem}
+  .task-chip{display:inline-flex;align-items:center;gap:.35rem;border:1px solid #dbe7f7;border-radius:999px;padding:.2rem .55rem;background:#fbfdff;font-size:.75rem}
+  .task-chip.done{background:#eefaf2;border-color:#cfe8d7;color:#165a34}
+  .task-chip.todo{background:#fffaf0;border-color:#f3dfb1;color:#7c5b06}
+  .header-actions .btn{border-radius:10px}
+  .artifact-card + .artifact-card{margin-top:.75rem}
+  .artifact-header{border-bottom:1px solid #edf2f8;margin:-1rem -1rem .75rem -1rem;padding:.9rem 1rem .75rem 1rem}
+  .note-chat-disabled textarea{background:#f8fafc}
 </style>
-</head><body>
+</head>
+<body>
 {{ nav_html | safe }}
-<div class="container py-4" style="max-width:1160px;">
+<div class="container py-4" style="max-width:1180px;">
+
+  {% if patient_msg %}
+  <div class="alert alert-{{ patient_msg_level }} d-flex align-items-center gap-2 mb-3">
+    <i class="bi {% if patient_msg_level in ['danger','warning'] %}bi-exclamation-triangle-fill{% else %}bi-check-circle-fill{% endif %}"></i>
+    <div>{{ patient_msg }}</div>
+  </div>
+  {% endif %}
+
   <div class="card-panel p-3 p-md-4 mb-3">
-    <div class="d-flex justify-content-between align-items-start flex-wrap gap-2">
-      <div><div class="label">Patient review</div><h3 class="mb-1 section-title">{{ patient_id }}</h3><div class="small-muted">Patient {{ idx + 1 }} of {{ total }}</div></div>
-      <div class="d-flex gap-2 flex-wrap"><a class="btn btn-sm btn-outline-primary" href="/results">Back</a>{% if prev_pid %}<a class="btn btn-sm btn-outline-secondary" href="{{ url_for('patient_review_page', patient_id=prev_pid) }}">Previous</a>{% endif %}{% if next_pid %}<a class="btn btn-sm btn-outline-secondary" href="{{ url_for('patient_review_page', patient_id=next_pid) }}">Next</a>{% endif %}</div>
+    <div class="d-flex justify-content-between align-items-start flex-wrap gap-3">
+      <div>
+        <div class="label">Patient review</div>
+        <h3 class="mb-1 section-title">{{ patient_id }}</h3>
+        <div class="small-muted">Patient {{ idx + 1 }} of {{ total }}</div>
+      </div>
+
+      <div class="d-flex flex-column align-items-md-end gap-2 header-actions">
+        <div class="d-flex gap-2 flex-wrap">
+          <a class="btn btn-sm btn-outline-primary" href="/results"><i class="bi bi-arrow-left me-1"></i>Back to Results</a>
+          {% if prev_pid %}
+          <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('patient_review_page', patient_id=prev_pid) }}"><i class="bi bi-chevron-left me-1"></i>Previous Patient</a>
+          {% endif %}
+          {% if next_pid %}
+          <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('patient_review_page', patient_id=next_pid) }}">Next Patient<i class="bi bi-chevron-right ms-1"></i></a>
+          {% endif %}
+        </div>
+        <div class="d-flex gap-2 flex-wrap align-items-center">
+          <form method="post" action="/results" class="d-inline">
+            <input type="hidden" name="action" value="toggle_reviewed">
+            <input type="hidden" name="patient_id" value="{{ patient_id }}">
+            <input type="hidden" name="next" value="{{ request.path }}">
+            <button class="btn btn-sm {% if reviewed_flag %}btn-outline-success{% else %}btn-outline-warning{% endif %}">
+              {% if reviewed_flag %}<i class="bi bi-check2-circle me-1"></i>Reviewed (click to unset){% else %}<i class="bi bi-circle me-1"></i>Mark Reviewed{% endif %}
+            </button>
+          </form>
+        </div>
+      </div>
     </div>
-    <div class="d-flex gap-2 flex-wrap mt-2">{% if risk and risk.risk_probability is not none %}<span class="pill">Risk {{ risk.risk_level or 'unknown' }} · {{ '%.3f'|format(risk.risk_probability) }}</span>{% endif %}{% if queue %}<span class="pill">Priority {{ queue.priority_level or 'n/a' }}{% if queue.priority_score is not none %} · {{ '%.2f'|format(queue.priority_score) }}{% endif %}</span>{% endif %}{% if reviewed_map.get(patient_id) %}<span class="badge bg-success">Reviewed</span>{% else %}<span class="badge bg-warning text-dark">Pending</span>{% endif %}</div>
+
+    <div class="d-flex gap-2 flex-wrap mt-2">
+      {% if risk and risk.risk_probability is not none %}
+      <span class="pill">
+        <span class="badge {{ _status_badge_class(risk.risk_level) }} me-2">{{ risk.risk_level or 'risk' }}</span>
+        Risk {{ '%.3f'|format(risk.risk_probability) }}
+      </span>
+      {% endif %}
+      {% if queue %}
+      <span class="pill">
+        <span class="badge {{ _status_badge_class(queue.priority_level) }} me-2">{{ queue.priority_level or 'priority' }}</span>
+        {% if queue.priority_score is not none %}Priority {{ '%.2f'|format(queue.priority_score) }}{% else %}Queue prioritized{% endif %}
+      </span>
+      {% endif %}
+      <span class="pill">{% if reviewed_flag %}Reviewed{% else %}Pending review{% endif %}</span>
+      {% for row in task_actions[:4] %}
+      <span class="task-chip {% if row.generated %}done{% else %}todo{% endif %}">
+        {% if row.generated %}<i class="bi bi-check2"></i>{% else %}<i class="bi bi-dot"></i>{% endif %}
+        {{ row.label }}
+      </span>
+      {% endfor %}
+    </div>
+
+    {% if bundle.selection_reason %}
     <div class="small-muted mt-2">{{ bundle.selection_reason }}</div>
+    {% endif %}
+  </div>
+
+  <div class="card-panel p-3 p-md-4 mb-3">
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
+      <div>
+        <div class="section-title">Task actions</div>
+        <div class="small-muted">Run or rerun any patient-level task and the page updates immediately.</div>
+      </div>
+      <div class="small-muted">{{ task_actions|length }} available task actions</div>
+    </div>
+    <form method="post" action="{{ url_for('patient_run_task_action', patient_id=patient_id) }}" class="row g-2 align-items-end">
+      <div class="col-md-6">
+        <label class="label mb-1">Task</label>
+        <select class="form-select form-select-sm" name="task_name" required>
+          {% for row in task_actions %}
+          <option value="{{ row.task_name }}">{{ row.label }} {% if row.generated %}(regenerate){% else %}(generate){% endif %}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-3">
+        <div class="form-check mt-4 pt-1">
+          <input class="form-check-input" type="checkbox" name="force_refresh" value="1" id="forceRefreshTask">
+          <label class="form-check-label small" for="forceRefreshTask">Force refresh</label>
+        </div>
+      </div>
+      <div class="col-md-3 d-flex justify-content-md-end">
+        <button class="btn btn-sm btn-primary mt-3 mt-md-0"><i class="bi bi-play-fill me-1"></i>Run Task</button>
+      </div>
+    </form>
+    <div class="d-flex gap-2 flex-wrap mt-2">
+      {% for row in task_actions[:6] %}
+      <form method="post" action="{{ url_for('patient_run_task_action', patient_id=patient_id) }}" class="d-inline">
+        <input type="hidden" name="task_name" value="{{ row.task_name }}">
+        <button class="btn btn-sm {% if row.generated %}btn-outline-secondary{% else %}btn-outline-primary{% endif %}">
+          {% if row.generated %}Regenerate{% else %}Generate{% endif %} {{ row.label }}
+        </button>
+      </form>
+      {% endfor %}
+    </div>
   </div>
 
   <div class="row g-3">
     <div class="col-lg-8">
-      <div class="card-panel p-3 p-md-4 mb-3">
-        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
-          <div class="section-title">Clinician summary</div>
-          <form method="post" action="/results">
-            <input type="hidden" name="action" value="mark_reviewed"><input type="hidden" name="patient_id" value="{{ patient_id }}"><input type="hidden" name="next" value="{{ request.path }}">
-            <button class="btn btn-sm btn-outline-success">Mark reviewed</button>
+      {% if primary_section %}
+      <div class="card-panel p-3 p-md-4 artifact-card">
+        <div class="artifact-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+          <div>
+            <div class="section-title">{{ primary_section.title }}</div>
+            <div class="small-muted">Primary output shown first based on the current workflow and available artifacts.</div>
+          </div>
+          <form method="post" action="{{ url_for('patient_run_task_action', patient_id=patient_id) }}" class="d-inline">
+            <input type="hidden" name="task_name" value="{{ primary_section.task_name }}">
+            <button class="btn btn-sm btn-outline-primary">Regenerate</button>
           </form>
         </div>
-        {% if clinician %}
-          <div class="mb-3">{{ clinician.summary_for_chart or 'No clinician summary available.' }}</div>
-          <div class="row g-3">
-            <div class="col-md-6"><div class="label">Suggested orders</div>{% if clinician.suggested_orders %}<ul class="mb-0">{% for x in clinician.suggested_orders %}<li>{{ x }}</li>{% endfor %}</ul>{% else %}<div class="small-muted">None</div>{% endif %}</div>
-            <div class="col-md-6"><div class="label">Suggested referrals</div>{% if clinician.suggested_referrals %}<ul class="mb-0">{% for x in clinician.suggested_referrals %}<li>{{ x }}</li>{% endfor %}</ul>{% else %}<div class="small-muted">None</div>{% endif %}</div>
-          </div>
-          <div class="mt-2"><div class="label">Safety netting</div>{% if clinician.safety_netting %}<ul class="mb-0">{% for x in clinician.safety_netting %}<li>{{ x }}</li>{% endfor %}</ul>{% else %}<div class="small-muted">None</div>{% endif %}</div>
-        {% else %}<div class="small-muted">No clinician summary artifact.</div>{% endif %}
+        {% set sec = primary_section %}
+        {% include '__artifact_render' %}
       </div>
-
+      {% else %}
       <div class="card-panel p-3 p-md-4 mb-3">
-        <div class="section-title mb-2">Admin referral</div>
-        {% if admin_referral %}
-          <div class="row g-2"><div class="col-md-4"><div class="label">Urgency</div><div>{{ admin_referral.urgency or 'N/A' }}</div></div><div class="col-md-8"><div class="label">Destination</div><div>{{ admin_referral.destination_service or 'N/A' }}</div></div></div>
-          <div class="mt-2"><div class="label">Reason</div><div>{{ admin_referral.reason_for_referral or 'N/A' }}</div></div>
-          <div class="row g-3 mt-1"><div class="col-md-6"><div class="label">Attach docs</div>{% if admin_referral.attach_documents %}<ul class="mb-0">{% for x in admin_referral.attach_documents %}<li>{{ x }}</li>{% endfor %}</ul>{% else %}<div class="small-muted">None</div>{% endif %}</div><div class="col-md-6"><div class="label">Admin notes</div>{% if admin_referral.admin_notes %}<ul class="mb-0">{% for x in admin_referral.admin_notes %}<li>{{ x }}</li>{% endfor %}</ul>{% else %}<div class="small-muted">None</div>{% endif %}</div></div>
-        {% else %}<div class="small-muted">No admin referral artifact.</div>{% endif %}
+        <div class="section-title">No generated outputs yet</div>
+        <div class="small-muted">Use the task actions above to generate clinician summaries, referrals, follow-up gap outputs, instructions, or other artifacts for this patient.</div>
       </div>
+      {% endif %}
 
-      <div class="card-panel p-3 p-md-4 mb-3">
-        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2"><div class="section-title">Referral letter</div>{% if referral_letter_text %}<a class="btn btn-sm btn-outline-success" href="{{ url_for('download_referral_letter', patient_id=patient_id) }}">Save letter</a>{% endif %}</div>
-        <form method="post" action="/results" class="mb-2"><input type="hidden" name="action" value="generate_referral_letter"><input type="hidden" name="patient_id" value="{{ patient_id }}"><input type="hidden" name="next" value="{{ request.path }}"><button class="btn btn-sm btn-primary">{% if referral_letter_text %}Regenerate{% else %}Generate{% endif %} letter</button></form>
-        {% if referral_letter_text %}<div class="mono-pre">{{ referral_letter_text }}</div>{% else %}<div class="small-muted">No referral letter generated yet.</div>{% endif %}
+      {% for sec in other_sections %}
+      <div class="card-panel p-3 p-md-4 artifact-card">
+        <div class="artifact-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+          <div class="section-title">{{ sec.title }}</div>
+          <form method="post" action="{{ url_for('patient_run_task_action', patient_id=patient_id) }}" class="d-inline">
+            <input type="hidden" name="task_name" value="{{ sec.task_name }}">
+            <button class="btn btn-sm btn-outline-primary">Regenerate</button>
+          </form>
+        </div>
+        {% include '__artifact_render' %}
       </div>
+      {% endfor %}
     </div>
 
     <div class="col-lg-4">
-      <div class="card-panel p-3 p-md-4 mb-3"><div class="section-title mb-2">Queue prioritization</div>{% if queue %}<div class="label">Reason</div><div>{{ queue.queue_reason or 'N/A' }}</div><div class="mt-2"><div class="label">Window</div><div>{{ queue.recommended_window or 'N/A' }}</div></div>{% else %}<div class="small-muted">No queue prioritization artifact.</div>{% endif %}</div>
-      <div class="card-panel p-3 p-md-4 mb-3"><div class="section-title mb-2">Patient instructions</div>{% if patient_instructions and patient_instructions.instructions %}<ul class="mb-0">{% for x in patient_instructions.instructions %}<li>{{ x }}</li>{% endfor %}</ul>{% else %}<div class="small-muted">No patient instructions artifact.</div>{% endif %}</div>
-      <div class="card-panel p-3 p-md-4 mb-3"><div class="section-title mb-2">Source note preview</div>{% if note_preview %}<div class="mono-pre">{{ note_preview }}</div>{% else %}<div class="small-muted">Source note unavailable in this session.</div>{% endif %}</div>
-      <div class="card-panel p-3 p-md-4"><details><summary>Raw JSON</summary><div class="mono-pre mt-2">{{ bundle | tojson(indent=2) }}</div></details></div>
+      <div class="card-panel p-3 p-md-4 mb-3">
+        <div class="section-title mb-2">Task output status</div>
+        <div class="d-flex flex-column gap-2">
+          {% for row in task_actions %}
+          <div class="d-flex align-items-center justify-content-between gap-2 border rounded-3 px-2 py-2" style="border-color:#e3eaf4 !important;">
+            <div class="small">
+              <div class="fw-semibold">{{ row.label }}</div>
+              <div class="small-muted">{% if row.generated %}Output available{% else %}Not generated{% endif %}</div>
+            </div>
+            <div class="d-flex align-items-center gap-2">
+              {% if row.generated %}
+                <span class="badge bg-success">Ready</span>
+              {% else %}
+                <span class="badge bg-light text-dark border">Pending</span>
+              {% endif %}
+              <form method="post" action="{{ url_for('patient_run_task_action', patient_id=patient_id) }}" class="d-inline">
+                <input type="hidden" name="task_name" value="{{ row.task_name }}">
+                <button class="btn btn-sm btn-outline-secondary">Run</button>
+              </form>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+
+      <div class="card-panel p-3 p-md-4 mb-3">
+        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
+          <div class="section-title">Patient instructions handout</div>
+          {% if patient_instructions_text %}
+          <div class="d-flex gap-1">
+            <a class="btn btn-sm btn-outline-success" href="{{ url_for('download_patient_instructions', patient_id=patient_id) }}">Save</a>
+            <a class="btn btn-sm btn-outline-secondary" target="_blank" href="{{ url_for('print_patient_instructions', patient_id=patient_id) }}">Print</a>
+          </div>
+          {% endif %}
+        </div>
+        {% if patient_instructions_text %}
+          <div class="mono-pre">{{ patient_instructions_text }}</div>
+        {% else %}
+          <div class="small-muted">No patient instructions generated yet.</div>
+        {% endif %}
+      </div>
+
+      <div class="card-panel p-3 p-md-4 mb-3">
+        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
+          <div class="section-title">Referral letter</div>
+          {% if referral_letter_text %}
+          <a class="btn btn-sm btn-outline-success" href="{{ url_for('download_referral_letter', patient_id=patient_id) }}">Save Letter</a>
+          {% endif %}
+        </div>
+        {% if referral_letter_text %}
+          <div class="mono-pre">{{ referral_letter_text }}</div>
+        {% else %}
+          <div class="small-muted">No referral letter generated yet.</div>
+        {% endif %}
+      </div>
+
+      <div class="card-panel p-3 p-md-4 mb-3">
+        <div class="section-title mb-2">Source note preview</div>
+        {% if note_preview %}
+          <div class="mono-pre">{{ note_preview }}</div>
+        {% else %}
+          <div class="small-muted">Source note unavailable in this session.</div>
+        {% endif %}
+      </div>
+
+      <div class="card-panel p-3 p-md-4 mb-3 note-chat-disabled">
+        <div class="section-title mb-1">Chart chat (prototype)</div>
+        <div class="small-muted mb-2">UI placeholder only for now. Backend chat on a single patient note is not wired yet.</div>
+        <textarea class="form-control form-control-sm mb-2" rows="3" placeholder="Ask about this chart..." disabled></textarea>
+        <button class="btn btn-sm btn-outline-secondary" disabled>Ask</button>
+      </div>
+
+      <div class="card-panel p-3 p-md-4">
+        <details open>
+          <summary class="fw-semibold">Raw JSON</summary>
+          <div class="mono-pre mt-2">{{ bundle | tojson(indent=2) }}</div>
+        </details>
+      </div>
     </div>
   </div>
 </div>
-</body></html>
-    """
+
+{% macro render_list(items) -%}
+  {% if items %}
+    <ul class="mb-0">
+    {% for x in items %}<li>{{ x }}</li>{% endfor %}
+    </ul>
+  {% else %}
+    <div class="small-muted">None</div>
+  {% endif %}
+{%- endmacro %}
+
+{% block artifact_partial %}
+{% endblock %}
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
+'''
+
+    artifact_include = '''
+{% if sec.kind == "risk_assessment" and sec.payload %}
+  <div class="row g-3">
+    <div class="col-md-4">
+      <div class="label">Risk level</div>
+      <div><span class="badge {{ _status_badge_class(sec.payload.risk_level) }}">{{ sec.payload.risk_level or "N/A" }}</span></div>
+    </div>
+    <div class="col-md-4">
+      <div class="label">Risk probability</div>
+      <div>{% if sec.payload.risk_probability is not none %}{{ "%.3f"|format(sec.payload.risk_probability) }}{% else %}N/A{% endif %}</div>
+    </div>
+    <div class="col-md-4">
+      <div class="label">Target / horizon</div>
+      <div>{{ sec.payload.target_condition or "N/A" }}{% if sec.payload.horizon_months %} · {{ sec.payload.horizon_months }} mo{% endif %}</div>
+    </div>
+  </div>
+  <div class="row g-3 mt-1">
+    <div class="col-md-6"><div class="label">Key risk factors</div>{% set items = sec.payload.key_risk_factors %}{{ render_list(items) }}</div>
+    <div class="col-md-6"><div class="label">Protective factors</div>{% set items = sec.payload.key_protective_factors %}{{ render_list(items) }}</div>
+  </div>
+  <div class="mt-2"><div class="label">Recommended next steps</div>{% set items = sec.payload.recommended_next_steps %}{{ render_list(items) }}</div>
+  <div class="mt-2"><div class="label">Safety notes</div>{% set items = sec.payload.safety_notes %}{{ render_list(items) }}</div>
+
+{% elif sec.kind == "clinician_summary" and sec.payload %}
+  <div class="mb-2">{{ sec.payload.summary_for_chart or "No summary text." }}</div>
+  <div class="row g-3">
+    <div class="col-md-6"><div class="label">Suggested orders</div>{% set items = sec.payload.suggested_orders %}{{ render_list(items) }}</div>
+    <div class="col-md-6"><div class="label">Suggested referrals</div>{% set items = sec.payload.suggested_referrals %}{{ render_list(items) }}</div>
+  </div>
+  <div class="mt-2"><div class="label">Safety netting</div>{% set items = sec.payload.safety_netting %}{{ render_list(items) }}</div>
+
+{% elif sec.kind == "admin_referral" and sec.payload %}
+  <div class="row g-3">
+    <div class="col-md-4"><div class="label">Urgency</div><div><span class="badge {{ _status_badge_class(sec.payload.urgency) }}">{{ sec.payload.urgency or "N/A" }}</span></div></div>
+    <div class="col-md-8"><div class="label">Destination</div><div>{{ sec.payload.destination_service or "N/A" }}</div></div>
+  </div>
+  <div class="mt-2"><div class="label">Reason</div><div>{{ sec.payload.reason_for_referral or "N/A" }}</div></div>
+  <div class="row g-3 mt-1">
+    <div class="col-md-6"><div class="label">Attach documents</div>{% set items = sec.payload.attach_documents %}{{ render_list(items) }}</div>
+    <div class="col-md-6"><div class="label">Admin notes</div>{% set items = sec.payload.admin_notes %}{{ render_list(items) }}</div>
+  </div>
+
+{% elif sec.kind == "queue_prioritization" and sec.payload %}
+  <div class="row g-3">
+    <div class="col-md-4"><div class="label">Priority level</div><div><span class="badge {{ _status_badge_class(sec.payload.priority_level) }}">{{ sec.payload.priority_level or "N/A" }}</span></div></div>
+    <div class="col-md-4"><div class="label">Priority score</div><div>{% if sec.payload.priority_score is not none %}{{ "%.2f"|format(sec.payload.priority_score) }}{% else %}N/A{% endif %}</div></div>
+    <div class="col-md-4"><div class="label">Window</div><div>{{ sec.payload.recommended_window or "N/A" }}</div></div>
+  </div>
+  <div class="mt-2"><div class="label">Queue reason</div><div>{{ sec.payload.queue_reason or "N/A" }}</div></div>
+
+{% elif sec.kind == "followup_gap_detection" and sec.payload %}
+  <div class="row g-3">
+    <div class="col-md-4"><div class="label">Gap severity</div><div><span class="badge {{ _status_badge_class(sec.payload.gap_severity) }}">{{ sec.payload.gap_severity or "N/A" }}</span></div></div>
+    <div class="col-md-8"><div class="label">Patient</div><div>{{ sec.payload.patient_id or patient_id }}</div></div>
+  </div>
+  <div class="row g-3 mt-1">
+    <div class="col-md-6"><div class="label">Pending items</div>{% set items = sec.payload.pending_items %}{{ render_list(items) }}</div>
+    <div class="col-md-6"><div class="label">Missed follow-up signals</div>{% set items = sec.payload.missed_followup_signals %}{{ render_list(items) }}</div>
+  </div>
+  <div class="mt-2"><div class="label">Suggested actions</div>{% set items = sec.payload.suggested_actions %}{{ render_list(items) }}</div>
+
+{% elif sec.kind == "lab_trend_summary" and sec.payload %}
+  <div class="row g-2">
+    <div class="col-md-4"><div class="label">Timeframe</div><div>{{ sec.payload.timeframe_label or "N/A" }}</div></div>
+  </div>
+  <div class="mt-2"><div class="label">Clinician summary</div><div>{{ sec.payload.clinician_summary or "N/A" }}</div></div>
+  <div class="mt-2"><div class="label">Patient-friendly summary</div><div>{{ sec.payload.patient_friendly_summary or "N/A" }}</div></div>
+  <div class="row g-3 mt-1">
+    <div class="col-md-6"><div class="label">Concerning trends</div>{% set items = sec.payload.concerning_trends %}{{ render_list(items) }}</div>
+    <div class="col-md-6"><div class="label">Suggested next steps</div>{% set items = sec.payload.suggested_next_steps %}{{ render_list(items) }}</div>
+  </div>
+
+{% elif sec.kind == "patient_instructions" and sec.payload %}
+  <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
+    <div class="small-muted">Patient-facing instructions output</div>
+    <div class="d-flex gap-1">
+      <a class="btn btn-sm btn-outline-success" href="{{ url_for('download_patient_instructions', patient_id=patient_id) }}">Save</a>
+      <a class="btn btn-sm btn-outline-secondary" target="_blank" href="{{ url_for('print_patient_instructions', patient_id=patient_id) }}">Print</a>
+    </div>
+  </div>
+  {% set items = sec.payload.instructions %}
+  {{ render_list(items) }}
+
+{% elif sec.kind == "referral_letter" and sec.payload %}
+  <div class="d-flex justify-content-end mb-2">
+    <a class="btn btn-sm btn-outline-success" href="{{ url_for('download_referral_letter', patient_id=patient_id) }}">Save letter</a>
+  </div>
+  <div class="mono-pre">{{ sec.payload }}</div>
+
+{% elif sec.kind == "results_summary" and sec.payload %}
+  <div class="mt-1"><div class="label">Labs summary</div><div>{{ sec.payload.labs_summary or "N/A" }}</div></div>
+  <div class="mt-2"><div class="label">Imaging summary</div><div>{{ sec.payload.imaging_summary or "N/A" }}</div></div>
+  <div class="mt-2"><div class="label">Trending summary</div><div>{{ sec.payload.trending_summary or "N/A" }}</div></div>
+
+{% elif sec.kind == "differential_diagnosis" and sec.payload %}
+  <div class="label">Possible diagnoses</div>{% set items = sec.payload.possible_diagnoses %}{{ render_list(items) }}
+  <div class="mt-2"><div class="label">Reasoning</div><div>{{ sec.payload.reasoning or "N/A" }}</div></div>
+
+{% elif sec.kind == "guideline_comparison" and sec.payload %}
+  <div class="label">Recommended guidelines</div>{% set items = sec.payload.recommended_guidelines %}{{ render_list(items) }}
+  <div class="mt-2"><div class="label">Evidence summary</div><div>{{ sec.payload.evidence_summary or "N/A" }}</div></div>
+
+{% elif sec.kind == "referral_intake_checklist" and sec.payload %}
+  <div class="row g-3">
+    <div class="col-md-8"><div class="label">Destination service</div><div>{{ sec.payload.destination_service or "N/A" }}</div></div>
+    <div class="col-md-4"><div class="label">Triage bucket</div><div><span class="badge {{ _status_badge_class(sec.payload.triage_bucket) }}">{{ sec.payload.triage_bucket or "N/A" }}</span></div></div>
+  </div>
+  <div class="row g-3 mt-1">
+    <div class="col-md-4"><div class="label">Available info</div>{% set items = sec.payload.available_info %}{{ render_list(items) }}</div>
+    <div class="col-md-4"><div class="label">Missing info</div>{% set items = sec.payload.missing_info %}{{ render_list(items) }}</div>
+    <div class="col-md-4"><div class="label">Checklist items</div>{% set items = sec.payload.checklist_items %}{{ render_list(items) }}</div>
+  </div>
+
+{% elif sec.kind == "care_plan_reconciliation" and sec.payload %}
+  <div class="row g-3">
+    <div class="col-md-6"><div class="label">Completed items</div>{% set items = sec.payload.completed_items %}{{ render_list(items) }}</div>
+    <div class="col-md-6"><div class="label">Unresolved items</div>{% set items = sec.payload.unresolved_items %}{{ render_list(items) }}</div>
+  </div>
+  <div class="row g-3 mt-1">
+    <div class="col-md-6"><div class="label">Changed items</div>{% set items = sec.payload.changed_items %}{{ render_list(items) }}</div>
+    <div class="col-md-6"><div class="label">Suggested next steps</div>{% set items = sec.payload.suggested_next_steps %}{{ render_list(items) }}</div>
+  </div>
+
+{% else %}
+  <div class="small-muted mb-2">Generic task output view</div>
+  <div class="mono-pre">{{ sec.payload | tojson(indent=2) }}</div>
+{% endif %}
+
+<details class="mt-2">
+  <summary class="small-muted">Artifact raw JSON</summary>
+  <div class="mono-pre mt-2">{{ sec.json_text }}</div>
+</details>
+'''
+
+    # Jinja does not support file includes from strings in render_template_string. Inline the artifact renderer template.
+    tpl = tpl.replace("{% include '__artifact_render' %}", artifact_include)
+
     return render_template_string(
         tpl,
         nav_html=_facetcare_navbar_html(active="results"),
@@ -2164,15 +2717,110 @@ def patient_review_page(patient_id: str) -> Any:
         next_pid=next_pid,
         bundle=bundle,
         risk=risk,
-        clinician=clinician,
-        admin_referral=admin_referral,
         queue=queue,
-        patient_instructions=patient_instructions,
-        referral_letter_text=referral_letter_text,
-        note_preview=note_preview,
-        reviewed_map=reviewed_map,
+        reviewed_flag=reviewed_flag,
         request=request,
+        note_preview=note_preview,
+        task_actions=task_actions,
+        primary_section=primary_section,
+        other_sections=other_sections,
+        patient_instructions_text=patient_instructions_text,
+        referral_letter_text=referral_letter_text,
+        patient_msg=patient_msg,
+        patient_msg_level=patient_msg_level,
+        _status_badge_class=_status_badge_class,
+        render_list=_jinja_render_list,
     )
+
+
+@app.post("/results/patient/<patient_id>/run-task")
+def patient_run_task_action(patient_id: str) -> Any:
+    task_name = (request.form.get("task_name") or "").strip()
+    force_refresh = request.form.get("force_refresh") == "1"
+    if not task_name:
+        qp = urlencode({"msg": "Choose a task first.", "lvl": "warning"})
+        return redirect(f"{url_for('patient_review_page', patient_id=patient_id)}?{qp}")
+    err = _run_single_task_action(patient_id, task_name, force_refresh=force_refresh)
+    if err:
+        qp = urlencode({"msg": err, "lvl": "danger"})
+    else:
+        qp = urlencode({"msg": f"Ran {task_name} for {patient_id}.", "lvl": "success"})
+    return redirect(f"{url_for('patient_review_page', patient_id=patient_id)}?{qp}")
+
+
+
+
+@app.get("/results/patient/<patient_id>/patient-instructions.txt")
+def download_patient_instructions(patient_id: str) -> Any:
+    _load_persisted_state()
+    with _lock:
+        results_obj = current_results
+    if results_obj is None:
+        return redirect("/results")
+    _, bundle_obj = _find_selected_bundle_index(results_obj, patient_id)
+    if bundle_obj is None:
+        return redirect("/results")
+    bundle = _jsonable(bundle_obj)
+    if not isinstance(bundle, dict):
+        return redirect(url_for("patient_review_page", patient_id=patient_id))
+    txt = _extract_patient_instructions_text(bundle)
+    if not txt:
+        qp = urlencode({"msg": "No patient instructions generated yet.", "lvl": "warning"})
+        return redirect(f"{url_for('patient_review_page', patient_id=patient_id)}?{qp}")
+    safe_pid = re.sub(r"[^A-Za-z0-9_-]+", "_", patient_id).strip("_") or "patient"
+    resp = make_response(txt)
+    resp.headers["Content-Type"] = "text/plain; charset=utf-8"
+    resp.headers["Content-Disposition"] = f'attachment; filename="patient_instructions_{safe_pid}.txt"'
+    return resp
+
+
+@app.get("/results/patient/<patient_id>/patient-instructions/print")
+def print_patient_instructions(patient_id: str) -> Any:
+    _load_persisted_state()
+    with _lock:
+        results_obj = current_results
+    if results_obj is None:
+        return redirect("/results")
+    _, bundle_obj = _find_selected_bundle_index(results_obj, patient_id)
+    if bundle_obj is None:
+        return redirect("/results")
+    bundle = _jsonable(bundle_obj)
+    if not isinstance(bundle, dict):
+        return redirect(url_for("patient_review_page", patient_id=patient_id))
+    txt = _extract_patient_instructions_text(bundle)
+    if not txt:
+        qp = urlencode({"msg": "No patient instructions generated yet.", "lvl": "warning"})
+        return redirect(f"{url_for('patient_review_page', patient_id=patient_id)}?{qp}")
+    lines = [ln.strip() for ln in str(txt).splitlines() if ln.strip()]
+    html = """<!doctype html>
+<html lang='en'>
+<head>
+<meta charset='utf-8'>
+<meta name='viewport' content='width=device-width, initial-scale=1'>
+<title>Patient Instructions · {patient_id}</title>
+<style>
+ body{{font-family:Segoe UI,Arial,sans-serif; margin:24px; color:#1f2937;}}
+ h1{{font-size:1.2rem; margin:0 0 6px 0;}}
+ .meta{{color:#6b7280; font-size:.9rem; margin-bottom:12px;}}
+ .box{{border:1px solid #d1d5db; border-radius:12px; padding:14px;}}
+ ol{{margin:0; padding-left:20px;}}
+ @media print {{ .noprint{{display:none}} body{{margin:0.5in;}} }}
+</style>
+</head>
+<body>
+  <div class='noprint' style='margin-bottom:10px;'>
+    <button onclick='window.print()'>Print</button>
+    <button onclick='window.close()'>Close</button>
+  </div>
+  <h1>Patient Instructions</h1>
+  <div class='meta'>Patient: {patient_id}</div>
+  <div class='box'>
+    <ol>{items}</ol>
+  </div>
+</body>
+</html>"""
+    items = "".join(f"<li>{re.sub(r'[<>]', '', line)}</li>" for line in lines)
+    return html.format(patient_id=re.sub(r'[<>]', '', patient_id), items=items)
 
 
 @app.get("/results/patient/<patient_id>/referral-letter")
