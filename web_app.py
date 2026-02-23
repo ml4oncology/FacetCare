@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import datetime as dt
 import os
 import random
 import re
@@ -9,7 +10,6 @@ import time
 from datetime import date
 from pathlib import Path
 from typing import Any, Dict, List, Optional
-import datetime as dt
 
 from flask import Flask, redirect, render_template_string, request, url_for, make_response
 
@@ -24,7 +24,7 @@ from openai import OpenAI
 
 ENDPOINT = "http://192.168.0.2:881/v1/"
 CLIENT = OpenAI(base_url=ENDPOINT, api_key="")
-MODEL = "gpt-4.1-mini"  # Replace with your served llama.cpp model name if needed.
+MODEL = "gpt-4.1-mini"  # Replace with model name if needed.
 
 app = Flask(__name__)
 
@@ -262,6 +262,38 @@ def _jsonable(value):
     if callable(dict_fn):
         return _jsonable(dict_fn())
     return str(value)
+
+
+def _facetcare_navbar_html(active: str = "dashboard", run_label: str = "Run Workflow", show_run: bool = True) -> str:
+    """Reusable top navbar for FacetCare pages."""
+    def _btn(active_name: str) -> str:
+        return "btn btn-sm btn-light text-primary fw-semibold" if active == active_name else "btn btn-sm btn-outline-light"
+
+    dashboard_btn = f'<a href="{url_for("dashboard")}" class="{_btn("dashboard")}"><i class="bi bi-grid-1x2 me-1"></i>Dashboard</a>'
+    setup_btn = f'<a href="{url_for("setup_plan")}" class="{_btn("setup")}"><i class="bi bi-sliders me-1"></i>Setup</a>'
+    plan_btn = f'<a href="{url_for("plan_page")}" class="{_btn("plan")}"><i class="bi bi-diagram-3 me-1"></i>Plan</a>'
+    results_btn = f'<a href="{url_for("results_page")}" class="{_btn("results")}"><i class="bi bi-table me-1"></i>Results</a>'
+
+    run_btn = ""
+    if show_run:
+        run_btn = (
+            f'<a href="{url_for("run_plan")}" class="{_btn("run")}">'
+            f'<i class="bi bi-play-fill me-1"></i>{run_label}</a>'
+        )
+
+    return (
+        '<div class="brand-bar d-flex align-items-center gap-3">'
+        '<i class="bi bi-heart-pulse-fill fs-3"></i>'
+        '<div>'
+        f'<a class="brand-title-link" href="{url_for("dashboard")}">FacetCare</a>'
+        '<div class="brand-subtitle">AI-Assisted Clinical Workflow Orchestration</div>'
+        '</div>'
+        '<div class="ms-auto d-flex align-items-center gap-2">'
+        f'{dashboard_btn}{setup_btn}{plan_btn}{run_btn}{results_btn}'
+        '</div>'
+        '</div>'
+    )
+
 
 def _load_persisted_state() -> None:
     global current_plan, current_results, run_state
@@ -1594,6 +1626,9 @@ def results_page():
                 msg = "Unknown action."
                 msg_level = "warning"
 
+        if next_redirect.startswith("/"):
+            return redirect(next_redirect)
+
     with _lock:
         plan = _ensure_plan_tasks_catalog(current_plan) if current_plan is not None else None
         if plan is not None and current_plan is not None and len(plan.tasks) != len(current_plan.tasks):
@@ -1779,7 +1814,8 @@ def results_page():
               <th>Reviewed</th>
               <th>Risk</th>
               <th>Artifacts</th>
-              <th>Queue</th>
+              <th>Priority</th>
+              <th>Review</th>
             </tr>
           </thead>
           <tbody>
@@ -1789,7 +1825,7 @@ def results_page():
             <tr>
               <td><input type=\"checkbox\" class=\"form-check-input row-check\" name=\"selected_patient_ids\" value=\"{{ b.patient_id }}\"/></td>
               <td>
-                <a href=\"#patient-{{ b.patient_id }}\" class=\"fw-semibold text-decoration-none\">{{ b.patient_id }}</a>
+                <a href=\"{{ url_for('patient_review_page', patient_id=b.patient_id) }}\" class=\"fw-semibold text-decoration-none\">{{ b.patient_id }}</a>
                 <div class=\"small-muted\">{{ _truncate_text(b.selection_reason or '', 70) }}</div>
               </td>
               <td>
@@ -1808,16 +1844,25 @@ def results_page():
                 {% endif %}
               </td>
               <td>
+                {% set q = (b.extra_outputs.queue_prioritization if b.extra_outputs else None) %}
+                {% if q %}
+                  <div class="small fw-semibold text-capitalize">{{ q.priority_level or 'n/a' }}</div>
+                  <div class="small-muted">{% if q.priority_score is not none %}{{ '%.2f'|format(q.priority_score) }}{% else %}N/A{% endif %}</div>
+                {% else %}
+                  <span class="badge bg-light text-dark border">None</span>
+                {% endif %}
+              </td>
+              <td>
                 {% for label, key in [('Risk','risk'),('Summary','clinician_summary'),('Referral','admin_referral'),('Letter','referral_letter'),('Instructions','patient_instructions')] %}
                   <span class=\"artifact-pill {% if flags.get(key) %}done{% endif %}\">{{ label }}</span>
                 {% endfor %}
               </td>
               <td>
-                <a href=\"#patient-{{ b.patient_id }}\" class=\"btn btn-sm btn-outline-primary\">Open</a>
+                <a href=\"{{ url_for('patient_review_page', patient_id=b.patient_id) }}\" class=\"btn btn-sm btn-outline-primary\">Open</a>
               </td>
             </tr>
             {% else %}
-            <tr><td colspan=\"6\" class=\"text-center text-muted py-3\">No patients match the current filter.</td></tr>
+            <tr><td colspan=\"7\" class=\"text-center text-muted py-3\">No patients match the current filter.</td></tr>
             {% endfor %}
           </tbody>
         </table>
@@ -1825,104 +1870,21 @@ def results_page():
     </form>
   </div>
 
-  <div class=\"d-flex align-items-center justify-content-between mb-2\">
-    <div class=\"section-title\">Patient review cards</div>
-    <div class=\"small-muted\">Open a card, generate missing artifacts, then mark reviewed.</div>
-  </div>
-
-  {% for b in filtered_bundles %}
-  {% set reviewed = reviewed_map.get(b.patient_id, False) %}
-  {% set flags = _bundle_artifact_flags(b) %}
-  {% set note = patient_lookup.get(b.patient_id) %}
-  <div id=\"patient-{{ b.patient_id }}\" class=\"card-panel patient-card {{ 'reviewed' if reviewed else 'unreviewed' }} p-3 p-md-4 mb-3\">
-    <div class=\"d-flex flex-wrap align-items-start justify-content-between gap-2\">
+  <div class="card-panel p-3 mb-3">
+    <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
       <div>
-        <div class=\"d-flex align-items-center gap-2 flex-wrap\">
-          <h5 class=\"mb-0 section-title\">{{ b.patient_id }}</h5>
-          {% if reviewed %}<span class=\"badge bg-success\">Reviewed</span>{% else %}<span class=\"badge bg-warning text-dark\">Needs review</span>{% endif %}
-          {% if b.risk %}
-            <span class=\"badge {% if (b.risk.risk_level or '').lower() == 'high' %}bg-danger{% elif (b.risk.risk_level or '').lower() == 'moderate' %}bg-warning text-dark{% else %}bg-secondary{% endif %}\">{{ b.risk.risk_level }}</span>
-            <span class=\"badge bg-light text-dark border\">{{ '%.3f'|format(b.risk.risk_probability) }}</span>
-          {% endif %}
-        </div>
-        <div class=\"small-muted mt-1\">{{ b.selection_reason }}</div>
+        <div class="section-title">Detailed review moved to a dedicated patient page</div>
+        <div class="small-muted">Use the Open button in the shortlist table to review one patient at a time with a cleaner layout and space for clinician summary, queue prioritization, source note preview, and raw JSON.</div>
       </div>
-      <div class=\"d-flex gap-1 flex-wrap\">
-        <form method=\"post\" class=\"d-inline\">
-          <input type=\"hidden\" name=\"patient_id\" value=\"{{ b.patient_id }}\"/>
-          <input type=\"hidden\" name=\"action\" value=\"{{ 'mark_unreviewed' if reviewed else 'mark_reviewed' }}\"/>
-          <button class=\"btn btn-sm {% if reviewed %}btn-outline-warning{% else %}btn-outline-success{% endif %}\" type=\"submit\">{{ 'Mark not reviewed' if reviewed else 'Mark reviewed' }}</button>
-        </form>
-        <a href=\"#top\" class=\"btn btn-sm btn-outline-secondary\" onclick=\"window.scrollTo({top:0,behavior:'smooth'}); return false;\">Top</a>
-      </div>
+      {% if filtered_bundles %}
+      <a href="{{ url_for('patient_review_page', patient_id=filtered_bundles[0].patient_id) }}" class="btn btn-sm btn-outline-primary">Open first patient</a>
+      {% endif %}
     </div>
-
-    <div class=\"mt-2\">
-      {% for label, key in [('Risk','risk'),('Summary','clinician_summary'),('Admin referral','admin_referral'),('Referral letter','referral_letter'),('Patient instructions','patient_instructions'),('Lab trend','lab_trend_summary'),('Follow-up gap','followup_gap_detection')] %}
-        <span class=\"artifact-pill {% if flags.get(key) %}done{% endif %}\">{{ label }}</span>
-      {% endfor %}
-    </div>
-
-    <details class=\"mt-2\">
-      <summary class=\"small-muted\">Source note preview</summary>
-      <div class=\"mono-pre mt-2\">{{ (note.longitudinal_notes if note else 'Note not found in sample dataset.') }}</div>
+    <details class="mt-2">
+      <summary class="small-muted">Filtered bundle JSON</summary>
+      <div class="mono-pre mt-2">{{ filtered_bundles | tojson(indent=2) }}</div>
     </details>
-
-    <div class=\"card mt-3 border-0\" style=\"background:#f8fbff;\">
-      <div class=\"card-body py-2 px-2 px-md-3\">
-        <div class=\"small-muted mb-2\">Generate or refresh artifacts for this patient</div>
-        <div class=\"d-flex flex-wrap gap-2\">
-          {% for action_name, label in [
-            ('generate_clinician_summary','Clinician summary'),
-            ('generate_admin_referral','Admin referral'),
-            ('generate_referral_letter','Referral letter'),
-            ('generate_patient_instructions','Patient instructions'),
-            ('generate_lab_trend_summary','Lab trend summary'),
-            ('generate_followup_gap','Follow-up gap')
-          ] %}
-          <form method=\"post\" class=\"d-inline-flex align-items-center gap-1\">
-            <input type=\"hidden\" name=\"patient_id\" value=\"{{ b.patient_id }}\"/>
-            <input type=\"hidden\" name=\"action\" value=\"{{ action_name }}\"/>
-            <button class=\"btn btn-sm btn-outline-primary\" type=\"submit\">{{ label }}</button>
-            <label class=\"form-check-label small text-muted ms-1\" style=\"font-size:0.72rem;\">
-              <input class=\"form-check-input me-1\" type=\"checkbox\" name=\"force_refresh\" value=\"1\"/>refresh
-            </label>
-          </form>
-          {% endfor %}
-        </div>
-      </div>
-    </div>
-
-    {% if b.risk %}
-    <div class=\"mt-3\">
-      <div class=\"fw-semibold\" style=\"color:#1a3c5e;\">Risk assessment</div>
-      <div class=\"small-muted\">{{ b.risk.target_condition }} • {{ b.risk.horizon_months }} months</div>
-      <div class=\"mono-pre mt-1\">{{ b.risk | tojson(indent=2) }}</div>
-    </div>
-    {% endif %}
-
-    {% if b.clinician_summary %}
-    <div class=\"mt-3\">
-      <div class=\"fw-semibold\" style=\"color:#1a3c5e;\">Clinician summary</div>
-      <div class=\"mono-pre mt-1\">{{ b.clinician_summary | tojson(indent=2) }}</div>
-    </div>
-    {% endif %}
-
-    {% if b.admin_referral %}
-    <div class=\"mt-3\">
-      <div class=\"fw-semibold\" style=\"color:#1a3c5e;\">Admin referral</div>
-      <div class=\"mono-pre mt-1\">{{ b.admin_referral | tojson(indent=2) }}</div>
-    </div>
-    {% endif %}
-
-    {% if b.extra_outputs %}
-    <details class=\"mt-3\">
-      <summary class=\"fw-semibold\" style=\"color:#1a3c5e;\">Additional outputs ({{ b.extra_outputs|length }})</summary>
-      <div class=\"mono-pre mt-2\">{{ b.extra_outputs | tojson(indent=2) }}</div>
-    </details>
-    {% endif %}
   </div>
-  {% endfor %}
 
   {% else %}
   <div class=\"card-panel p-4 text-center\">
@@ -1971,6 +1933,171 @@ function toggleAllRows(flag) {
 @app.route("/edit_plan", methods=["GET", "POST"])
 def edit_plan_alias():
     return plan_page()
+
+
+def _find_selected_bundle_index(results_obj: Any, patient_id: str) -> tuple[int, Any | None]:
+    selected_raw = results_obj.get("selected", []) if isinstance(results_obj, dict) else getattr(results_obj, "selected", [])
+    selected = list(selected_raw or [])
+    for idx, bundle in enumerate(selected):
+        bundle_pid = bundle.get("patient_id") if isinstance(bundle, dict) else getattr(bundle, "patient_id", "")
+        if str(bundle_pid) == str(patient_id):
+            return idx, bundle
+    return -1, None
+
+
+def _source_note_preview(patient_id: str, max_chars: int = 5000) -> str:
+    global patients_cache
+    try:
+        if not patients_cache:
+            patients_cache = _load_patients()
+        for p in patients_cache or []:
+            if str(getattr(p, "patient_id", "")) == str(patient_id):
+                return _truncate_text(str(getattr(p, "longitudinal_notes", "") or ""), max_chars)
+    except Exception:
+        return ""
+    return ""
+
+
+def _extract_referral_letter_text(bundle_dict: dict[str, Any]) -> str:
+    extra = bundle_dict.get("extra_outputs") or {}
+    letter = extra.get("referral_letter")
+    if letter is None:
+        return ""
+    letter = _jsonable(letter)
+    if isinstance(letter, str):
+        return letter
+    if isinstance(letter, list):
+        return "\n".join(str(x) for x in letter)
+    if isinstance(letter, dict):
+        for key in ("letter_text", "letter_body", "body", "content", "text", "referral_letter", "letter"):
+            v = letter.get(key)
+            if isinstance(v, str) and v.strip():
+                return v
+    return json.dumps(letter, indent=2, ensure_ascii=False)
+
+
+@app.route("/results/patient/<patient_id>")
+def patient_review_page(patient_id: str) -> Any:
+    global current_results
+    with _lock:
+        _load_persisted_state()
+        current_results = _jsonable(current_results)
+    if current_results is None:
+        return redirect("/run")
+
+    idx, bundle_obj = _find_selected_bundle_index(current_results, patient_id)
+    if bundle_obj is None:
+        return redirect("/results")
+
+    selected_all_raw = current_results.get("selected", []) if isinstance(current_results, dict) else getattr(current_results, "selected", [])
+    selected_all = list(selected_all_raw or [])
+    prev_pid = str(getattr(selected_all[idx - 1], "patient_id", "")) if idx > 0 else None
+    next_pid = str(getattr(selected_all[idx + 1], "patient_id", "")) if idx + 1 < len(selected_all) else None
+
+    bundle = _jsonable(bundle_obj)
+    if not isinstance(bundle, dict):
+        bundle = {}
+    extra = bundle.get("extra_outputs") or {}
+    risk = bundle.get("risk") or {}
+    clinician = bundle.get("clinician_summary") or {}
+    admin_referral = bundle.get("admin_referral") or {}
+    queue = extra.get("queue_prioritization") or {}
+    patient_instructions = extra.get("patient_instructions") or {}
+    referral_letter_text = _extract_referral_letter_text(bundle)
+    note_preview = _source_note_preview(patient_id)
+    reviewed_map = _review_map_for_results(current_results)
+    artifacts = _bundle_artifact_flags(bundle)
+
+    tpl = """
+<!doctype html>
+<html lang=\"en\"><head>
+<meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">
+<title>FacetCare · Patient Review</title>
+<link href=\"https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css\" rel=\"stylesheet\">
+<style>body{background:#f4f7fb}.card-panel{background:#fff;border:1px solid #dce7f3;border-radius:16px;box-shadow:0 6px 18px rgba(12,34,56,.06)}.small-muted{font-size:.82rem;color:#6b7a8d}.section-title{font-weight:700;color:#17324d}.label{font-size:.72rem;text-transform:uppercase;color:#6b7a8d;letter-spacing:.04em}.mono-pre{white-space:pre-wrap;background:#fbfdff;border:1px solid #dce7f3;border-radius:10px;padding:.75rem;max-height:320px;overflow:auto;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:.82rem}.pill{display:inline-flex;border:1px solid #dce7f3;background:#f7fbff;border-radius:999px;padding:.2rem .55rem;font-size:.75rem}</style>
+</head><body>
+{{ nav_html | safe }}
+<div class=\"container py-4\" style=\"max-width:1160px;\">
+  <div class=\"card-panel p-3 p-md-4 mb-3\">
+    <div class=\"d-flex justify-content-between align-items-start flex-wrap gap-2\">
+      <div><div class=\"label\">Patient review</div><h3 class=\"mb-1 section-title\">{{ patient_id }}</h3><div class=\"small-muted\">Patient {{ idx + 1 }} of {{ total }}</div></div>
+      <div class=\"d-flex gap-2 flex-wrap\"><a class=\"btn btn-sm btn-outline-primary\" href=\"/results\">Back</a>{% if prev_pid %}<a class=\"btn btn-sm btn-outline-secondary\" href=\"{{ url_for('patient_review_page', patient_id=prev_pid) }}\">Previous</a>{% endif %}{% if next_pid %}<a class=\"btn btn-sm btn-outline-secondary\" href=\"{{ url_for('patient_review_page', patient_id=next_pid) }}\">Next</a>{% endif %}</div>
+    </div>
+    <div class=\"d-flex gap-2 flex-wrap mt-2\">{% if risk and risk.risk_probability is not none %}<span class=\"pill\">Risk {{ risk.risk_level or 'unknown' }} · {{ '%.3f'|format(risk.risk_probability) }}</span>{% endif %}{% if queue %}<span class=\"pill\">Priority {{ queue.priority_level or 'n/a' }}{% if queue.priority_score is not none %} · {{ '%.2f'|format(queue.priority_score) }}{% endif %}</span>{% endif %}{% if reviewed_map.get(patient_id) %}<span class=\"badge bg-success\">Reviewed</span>{% else %}<span class=\"badge bg-warning text-dark\">Pending</span>{% endif %}</div>
+    <div class=\"small-muted mt-2\">{{ bundle.selection_reason }}</div>
+  </div>
+
+  <div class=\"row g-3\">
+    <div class=\"col-lg-8\">
+      <div class=\"card-panel p-3 p-md-4 mb-3\">
+        <div class=\"d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2\">
+          <div class=\"section-title\">Clinician summary</div>
+          <form method=\"post\" action=\"/results\">
+            <input type=\"hidden\" name=\"action\" value=\"mark_reviewed\"><input type=\"hidden\" name=\"patient_id\" value=\"{{ patient_id }}\"><input type=\"hidden\" name=\"next\" value=\"{{ request.path }}\">
+            <button class=\"btn btn-sm btn-outline-success\">Mark reviewed</button>
+          </form>
+        </div>
+        {% if clinician %}
+          <div class=\"mb-3\">{{ clinician.summary_for_chart or 'No clinician summary available.' }}</div>
+          <div class=\"row g-3\">
+            <div class=\"col-md-6\"><div class=\"label\">Suggested orders</div>{% if clinician.suggested_orders %}<ul class=\"mb-0\">{% for x in clinician.suggested_orders %}<li>{{ x }}</li>{% endfor %}</ul>{% else %}<div class=\"small-muted\">None</div>{% endif %}</div>
+            <div class=\"col-md-6\"><div class=\"label\">Suggested referrals</div>{% if clinician.suggested_referrals %}<ul class=\"mb-0\">{% for x in clinician.suggested_referrals %}<li>{{ x }}</li>{% endfor %}</ul>{% else %}<div class=\"small-muted\">None</div>{% endif %}</div>
+          </div>
+          <div class=\"mt-2\"><div class=\"label\">Safety netting</div>{% if clinician.safety_netting %}<ul class=\"mb-0\">{% for x in clinician.safety_netting %}<li>{{ x }}</li>{% endfor %}</ul>{% else %}<div class=\"small-muted\">None</div>{% endif %}</div>
+        {% else %}<div class=\"small-muted\">No clinician summary artifact.</div>{% endif %}
+      </div>
+
+      <div class=\"card-panel p-3 p-md-4 mb-3\">
+        <div class=\"section-title mb-2\">Admin referral</div>
+        {% if admin_referral %}
+          <div class=\"row g-2\"><div class=\"col-md-4\"><div class=\"label\">Urgency</div><div>{{ admin_referral.urgency or 'N/A' }}</div></div><div class=\"col-md-8\"><div class=\"label\">Destination</div><div>{{ admin_referral.destination_service or 'N/A' }}</div></div></div>
+          <div class=\"mt-2\"><div class=\"label\">Reason</div><div>{{ admin_referral.reason_for_referral or 'N/A' }}</div></div>
+          <div class=\"row g-3 mt-1\"><div class=\"col-md-6\"><div class=\"label\">Attach docs</div>{% if admin_referral.attach_documents %}<ul class=\"mb-0\">{% for x in admin_referral.attach_documents %}<li>{{ x }}</li>{% endfor %}</ul>{% else %}<div class=\"small-muted\">None</div>{% endif %}</div><div class=\"col-md-6\"><div class=\"label\">Admin notes</div>{% if admin_referral.admin_notes %}<ul class=\"mb-0\">{% for x in admin_referral.admin_notes %}<li>{{ x }}</li>{% endfor %}</ul>{% else %}<div class=\"small-muted\">None</div>{% endif %}</div></div>
+        {% else %}<div class=\"small-muted\">No admin referral artifact.</div>{% endif %}
+      </div>
+
+      <div class=\"card-panel p-3 p-md-4 mb-3\">
+        <div class=\"d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2\"><div class=\"section-title\">Referral letter</div>{% if referral_letter_text %}<a class=\"btn btn-sm btn-outline-success\" href=\"{{ url_for('download_referral_letter', patient_id=patient_id) }}\">Save letter</a>{% endif %}</div>
+        <form method=\"post\" action=\"/results\" class=\"mb-2\"><input type=\"hidden\" name=\"action\" value=\"generate_referral_letter\"><input type=\"hidden\" name=\"patient_id\" value=\"{{ patient_id }}\"><input type=\"hidden\" name=\"next\" value=\"{{ request.path }}\"><button class=\"btn btn-sm btn-primary\">{% if referral_letter_text %}Regenerate{% else %}Generate{% endif %} letter</button></form>
+        {% if referral_letter_text %}<div class=\"mono-pre\">{{ referral_letter_text }}</div>{% else %}<div class=\"small-muted\">No referral letter generated yet.</div>{% endif %}
+      </div>
+    </div>
+
+    <div class=\"col-lg-4\">
+      <div class=\"card-panel p-3 p-md-4 mb-3\"><div class=\"section-title mb-2\">Queue prioritization</div>{% if queue %}<div class=\"label\">Reason</div><div>{{ queue.queue_reason or 'N/A' }}</div><div class=\"mt-2\"><div class=\"label\">Window</div><div>{{ queue.recommended_window or 'N/A' }}</div></div>{% else %}<div class=\"small-muted\">No queue prioritization artifact.</div>{% endif %}</div>
+      <div class=\"card-panel p-3 p-md-4 mb-3\"><div class=\"section-title mb-2\">Patient instructions</div>{% if patient_instructions and patient_instructions.instructions %}<ul class=\"mb-0\">{% for x in patient_instructions.instructions %}<li>{{ x }}</li>{% endfor %}</ul>{% else %}<div class=\"small-muted\">No patient instructions artifact.</div>{% endif %}</div>
+      <div class=\"card-panel p-3 p-md-4 mb-3\"><div class=\"section-title mb-2\">Source note preview</div>{% if note_preview %}<div class=\"mono-pre\">{{ note_preview }}</div>{% else %}<div class=\"small-muted\">Source note unavailable in this session.</div>{% endif %}</div>
+      <div class=\"card-panel p-3 p-md-4\"><details><summary>Raw JSON</summary><div class=\"mono-pre mt-2\">{{ bundle | tojson(indent=2) }}</div></details></div>
+    </div>
+  </div>
+</div>
+</body></html>
+    """
+    return render_template_string(tpl, nav_html=_facetcare_navbar_html(active="results"), patient_id=patient_id, idx=idx, total=len(selected_all), prev_pid=prev_pid, next_pid=next_pid, bundle=bundle, risk=risk, clinician=clinician, admin_referral=admin_referral, queue=queue, patient_instructions=patient_instructions, referral_letter_text=referral_letter_text, note_preview=note_preview, reviewed_map=reviewed_map)
+
+
+@app.get("/results/patient/<patient_id>/referral-letter")
+def download_referral_letter(patient_id: str) -> Any:
+    global current_results
+    with _lock:
+        _load_persisted_state()
+        current_results = _jsonable(current_results)
+    if current_results is None:
+        return redirect("/run")
+    _, bundle_obj = _find_selected_bundle_index(current_results, patient_id)
+    if bundle_obj is None:
+        return redirect("/results")
+    bundle = _jsonable(bundle_obj)
+    if not isinstance(bundle, dict):
+        return redirect(url_for("patient_review_page", patient_id=patient_id))
+    txt = _extract_referral_letter_text(bundle)
+    if not txt:
+        return redirect(url_for("patient_review_page", patient_id=patient_id))
+    safe_pid = re.sub(r"[^A-Za-z0-9_-]+", "_", patient_id).strip("_") or "patient"
+    resp = make_response(txt)
+    resp.headers["Content-Type"] = "text/plain; charset=utf-8"
+    resp.headers["Content-Disposition"] = f'attachment; filename="referral_letter_{safe_pid}.txt"'
+    return resp
 
 
 if __name__ == "__main__":
