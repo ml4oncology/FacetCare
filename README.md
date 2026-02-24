@@ -78,7 +78,7 @@ Then open `http://<your-machine-ip>:5000` in a browser.
 **Example — localhost only (default):**
 
 ```bash
-python web_app.py --endpoint http://127.0.0.1:8080/v1/ --model llama-3-8b
+python web_app.py --endpoint http://127.0.0.1:8080/v1/ --model medgemma-1.5-4b-it
 ```
 
 Then open `http://127.0.0.1:5000` in a browser.
