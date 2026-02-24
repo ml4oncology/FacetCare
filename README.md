@@ -1,6 +1,6 @@
-# facetcare_project
+# FacetCare
 
-Plan-driven clinic workflow orchestration with LLM tasks (llama.cpp/vLLM compatible).
+Plan-driven clinic workflow orchestration with LLM tasks using MedGemma (llama.cpp/vLLM compatible).
 
 ## What is this
 - A Plan Builder converts a clinic's natural-language workflow description into a validated Clinic Plan (JSON).
@@ -15,6 +15,6 @@ Plan-driven clinic workflow orchestration with LLM tasks (llama.cpp/vLLM compati
 pip install pydantic openai
 
 ## Run
-python demo.py
+python web_app.py
 
-Edit demo.py to match your local llama.cpp base_url and served model name.
+Edit web_app.py to match your local base_url.
