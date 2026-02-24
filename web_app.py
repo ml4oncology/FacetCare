@@ -25,9 +25,18 @@ from facetcare.dedup import JSONFileDedupStore
 
 from openai import OpenAI
 
-ENDPOINT = "http://192.168.0.2:881/v1/"
+import argparse
+
+_arg_parser = argparse.ArgumentParser(description="FacetCare Web App")
+_arg_parser.add_argument("--endpoint", default=os.environ.get("FACETCARE_ENDPOINT", "http://192.168.0.2:881/v1/"), help="LLM API endpoint URL")
+_arg_parser.add_argument("--model", default=os.environ.get("FACETCARE_MODEL", "medgemma"), help="Model name")
+_arg_parser.add_argument("--host", default=os.environ.get("FACETCARE_HOST", "127.0.0.1"), help="Flask host (default: 127.0.0.1)")
+_arg_parser.add_argument("--port", type=int, default=int(os.environ.get("FACETCARE_PORT", "5000")), help="Flask port (default: 5000)")
+_args, _unknown = _arg_parser.parse_known_args()
+
+ENDPOINT = _args.endpoint
+MODEL = _args.model
 CLIENT = OpenAI(base_url=ENDPOINT, api_key="")
-MODEL = "medgemma"
 
 app = Flask(__name__)
 
@@ -1411,7 +1420,7 @@ def plan_page():
     </div>
     <div class="card-panel p-4 d-flex flex-wrap align-items-center justify-content-between gap-3">
       <div><div class="fw-semibold" style="color:#1a3c5e;">Ready to proceed?</div><div class="field-hint">Save your plan first, then run the workflow.</div></div>
-      <div class="d-flex gap-2 flex-wrap"><button type="submit" class="btn btn-primary-facetcare" id="saveBtn"><i class="bi bi-floppy me-1"></i>Save Plan</button><a href="/run" class="btn btn-run" id="runBtn"><i class="bi bi-play-fill me-1"></i>{{ ui_flags.run_label }}</a></div>
+      <div class="d-flex gap-2 flex-wrap"><button type="submit" class="btn btn-primary-facetcare" id="saveBtn"><i class="bi bi-floppy me-1"></i>Save Plan</button><button type="button" class="btn btn-run" id="runBtn" onclick="handleRunClick()"><i class="bi bi-play-fill me-1"></i>{{ ui_flags.run_label }}</button></div>
     </div>
   </form>
 </div>
@@ -1552,11 +1561,19 @@ function applyDirtyState(isDirty) {
   planSaved = !isDirty;
   const banner = document.getElementById('unsavedBanner');
   if (banner) banner.style.display = isDirty ? 'flex' : 'none';
+  updateSaveButton();
   updateRunButton();
 }
 
 function refreshDirtyState() {
   applyDirtyState(serializeFormState() !== baselineSnapshot);
+}
+
+function hasAnyUnmetDependencies() {
+  return getActiveNames().some(name => {
+    const deps = DEPENDS_ON[name] || [];
+    return deps.some(d => !taskState[d] || !taskState[d].enabled);
+  });
 }
 
 function getActiveNames() {
@@ -1625,6 +1642,8 @@ function renderAllTasks() {
 
   buildHiddenInputs();
   updateAdaptiveUi();
+  updateSaveButton();
+  updateRunButton();
 }
 
 function makeCard(name, enabled) {
@@ -1730,21 +1749,41 @@ function markUnsaved() {
   refreshDirtyState();
 }
 
+function updateSaveButton() {
+  const btn = document.getElementById('saveBtn');
+  if (!btn) return;
+  if (hasAnyUnmetDependencies()) {
+    btn.disabled = true;
+    btn.title = 'Resolve unmet task dependencies before saving.';
+  } else {
+    btn.disabled = false;
+    btn.title = '';
+  }
+}
+
 function updateRunButton() {
   const btn = document.getElementById('runBtn');
   if (!btn) return;
-  if (!planSaved) {
+  if (!planSaved || hasAnyUnmetDependencies()) {
     btn.classList.add('disabled');
     btn.setAttribute('aria-disabled', 'true');
-    btn.onclick = e => {
-      e.preventDefault();
-      document.getElementById('unsavedBanner').scrollIntoView({ behavior: 'smooth' });
-    };
   } else {
     btn.classList.remove('disabled');
     btn.removeAttribute('aria-disabled');
-    btn.onclick = null;
   }
+}
+
+function handleRunClick() {
+  if (hasAnyUnmetDependencies()) {
+    alert('Cannot run: one or more active tasks have unmet dependencies. Please fix them before running.');
+    return;
+  }
+  if (!planSaved) {
+    document.getElementById('unsavedBanner').scrollIntoView({ behavior: 'smooth' });
+    alert('Please save the plan before running.');
+    return;
+  }
+  window.location.href = '/run';
 }
 
 function init() {
@@ -1759,7 +1798,12 @@ function init() {
 
 document.getElementById('planForm').addEventListener('change', markUnsaved);
 document.getElementById('planForm').addEventListener('input', markUnsaved);
-document.getElementById('planForm').addEventListener('submit', () => {
+document.getElementById('planForm').addEventListener('submit', (e) => {
+  if (hasAnyUnmetDependencies()) {
+    e.preventDefault();
+    alert('Cannot save plan: one or more active tasks have unmet dependencies. Please resolve them before saving.');
+    return;
+  }
   buildHiddenInputs();
   baselineSnapshot = serializeFormState();
   applyDirtyState(false);
@@ -2159,7 +2203,7 @@ def results_page():
         <div class="small-muted">Use the Open button in the shortlist table to review one patient at a time with a cleaner layout and space for clinician summary, queue prioritization, source note preview, and raw JSON.</div>
       </div>
       {% if filtered_bundles %}
-      <a href="{{ url_for('patient_review_page', patient_id=filtered_bundles[0].patient_id) }}" class="btn btn-sm btn-outline-primary">Open first patient</a>
+      <a href="{{ url_for('patient_review_page', patient_id=filtered_bundles[0].patient_id) }}" class="btn btn-sm btn-outline-primary">Open first unreviewed patient</a>
       {% endif %}
     </div>
     <details class="mt-2">
@@ -3149,4 +3193,4 @@ def print_referral_letter(patient_id: str) -> Any:
 
 
 if __name__ == "__main__":
-    app.run(host="127.0.0.1", port=5000, debug=True)
+    app.run(host=_args.host, port=_args.port, debug=True)
