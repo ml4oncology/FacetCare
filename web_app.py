@@ -26,7 +26,7 @@ from openai import OpenAI
 
 ENDPOINT = "http://192.168.0.2:881/v1/"
 CLIENT = OpenAI(base_url=ENDPOINT, api_key="")
-MODEL = "gpt-4.1-mini"  # Replace with your served llama.cpp model name if needed.
+MODEL = "medgemma" 
 
 app = Flask(__name__)
 
@@ -584,39 +584,94 @@ def _sample_patients_path() -> Path:
 def _generate_demo_patients(n: int = 100) -> List[PatientRecord]:
     rng = random.Random(42)
     records: List[PatientRecord] = []
+
+    first_names = ["Alex", "Jordan", "Sam", "Taylor", "Morgan", "Casey", "Jamie", "Cameron", "Riley", "Avery"]
+    last_names = ["Wong", "Patel", "Singh", "Smith", "Chen", "Brown", "Garcia", "Khan", "Li", "Martin"]
+    street_names = ["Maple Ave", "Bayview Ave", "Yonge St", "King Rd", "Elgin Mills Rd", "Leslie St", "Woodbine Ave"]
     symptom_pool = [
-        "epigastric pain",
-        "weight loss",
-        "new-onset diabetes",
-        "jaundice denied",
-        "back pain",
-        "dyspepsia",
-        "fatigue",
-        "decreased appetite",
-        "bloating",
-        "nausea",
+        "epigastric discomfort", "unintentional weight loss", "new-onset diabetes", "intermittent back pain",
+        "dyspepsia", "fatigue", "decreased appetite", "bloating", "nausea", "early satiety", "dark urine", "pruritus"
     ]
-    chronic_pool = ["HTN", "T2DM", "hyperlipidemia", "GERD", "none documented"]
+    chronic_pool = ["hypertension", "type 2 diabetes", "hyperlipidemia", "GERD", "NAFLD", "no major chronic disease documented"]
+    lab_bits = [
+        "CBC reviewed; no critical abnormalities documented.",
+        "LFTs mildly abnormal; repeat ordered.",
+        "A1c increased compared with prior.",
+        "Lipase within normal range per note.",
+        "Ferritin pending at time of visit.",
+        "Repeat CMP planned in 4 weeks."
+    ]
+    imaging_bits = [
+        "Abdominal ultrasound requested.",
+        "CT abdomen discussed; completion status unclear.",
+        "No recent imaging available in chart.",
+        "MRI deferred pending specialist advice."
+    ]
+
     for i in range(1, n + 1):
         pid = f"P{i:04d}"
-        age = rng.randint(38, 84)
+        year = rng.randint(1942, 1988)
+        month = rng.randint(1, 12)
+        day = rng.randint(1, 28)
+        dob = dt.date(year, month, day)
+        age = dt.date.today().year - dob.year - ((dt.date.today().month, dt.date.today().day) < (dob.month, dob.day))
         sex = rng.choice(["F", "M"])
+        patient_name = f"{rng.choice(first_names)} {rng.choice(last_names)}"
+        ohip = f"{rng.randint(1000,9999)}-{rng.randint(100,999)}-{rng.randint(100,999)}"
+        address = f"{rng.randint(10,999)} {rng.choice(street_names)}, Richmond Hill, ON"
+        phone = f"905-{rng.randint(200,999)}-{rng.randint(1000,9999)}"
+
+        n_notes = rng.randint(5, 8)
+        base_date = dt.date(2019, rng.randint(1, 12), rng.randint(1, 28))
+        entries = []
         chronic = rng.sample(chronic_pool, k=2)
-        symptoms = rng.sample(symptom_pool, k=3)
-        note = (
-            f"Family medicine progress notes for {pid}. Age {age} {sex}. "
-            f"PMH: {', '.join(chronic)}. "
-            f"Recent visits mention {', '.join(symptoms)}. "
-            f"Follow-up plan discussed, labs/imaging may be pending. "
-            f"Patient advised to return if symptoms worsen."
+        baseline_symptoms = rng.sample(symptom_pool, k=2)
+        fam_hist = (i % 7 == 0)
+        imaging_flag = (i % 9 == 0)
+        lft_flag = (i % 11 == 0)
+
+        for j in range(n_notes):
+            visit_date = base_date + dt.timedelta(days=120 * j + rng.randint(0, 40))
+            visit_symptoms = rng.sample(symptom_pool, k=2)
+            pieces = [
+                f"Family medicine follow-up. Patient is {age} years old ({sex}).",
+                f"PMH includes {', '.join(chronic)}.",
+                f"Current concerns: {', '.join(visit_symptoms)}.",
+                rng.choice(lab_bits),
+                rng.choice(imaging_bits),
+            ]
+            if j == 0:
+                pieces.append(f"Baseline longitudinal concerns include {', '.join(baseline_symptoms)}.")
+            if fam_hist and j in {1, 3}:
+                pieces.append("Family history of pancreatic or GI malignancy documented in a first-degree relative.")
+            if imaging_flag and j in {2, 4}:
+                pieces.append("Prior CT abdomen was ordered; completion/report not clearly documented in the chart.")
+            if lft_flag and j >= 2:
+                pieces.append("Repeated note references mild cholestatic LFT pattern; trend review recommended.")
+            if j == n_notes - 1:
+                pieces.append("Return precautions reviewed. Follow-up planned after pending investigations.")
+            entries.append(
+                {
+                    "visit_date": visit_date.isoformat(),
+                    "source": "family_medicine_progress_note",
+                    "note_text": " ".join(pieces),
+                }
+            )
+
+        note_blocks = [f"[{e['visit_date']} | {e['source']}]\n{e['note_text']}" for e in entries]
+        records.append(
+            PatientRecord(
+                patient_id=pid,
+                patient_name=patient_name,
+                date_of_birth=dob.isoformat(),
+                sex=sex,
+                ohip_number=ohip,
+                address=address,
+                phone=phone,
+                longitudinal_note_entries=entries,
+                longitudinal_notes="\n\n".join(note_blocks),
+            )
         )
-        if i % 7 == 0:
-            note += " Family history of GI malignancy mentioned."
-        if i % 9 == 0:
-            note += " CT abdomen ordered but completion unclear."
-        if i % 11 == 0:
-            note += " Recurrent abnormal LFT wording appears in note summaries."
-        records.append(PatientRecord(patient_id=pid, longitudinal_notes=note))
     return records
 
 
