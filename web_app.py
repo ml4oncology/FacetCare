@@ -26,7 +26,7 @@ from openai import OpenAI
 
 ENDPOINT = "http://192.168.0.2:881/v1/"
 CLIENT = OpenAI(base_url=ENDPOINT, api_key="")
-MODEL = "gpt-4.1-mini"  # Replace with model name if needed.
+MODEL = "gpt-4.1-mini"  # Replace with your served llama.cpp model name if needed.
 
 app = Flask(__name__)
 
@@ -148,24 +148,38 @@ def _chart_chat_llm_answer(
         if a:
             recent_turns.append({'role': 'assistant', 'content': a})
 
-    system_prompt = (
-        'You are a clinical chart assistant for a demo review UI. '
-        'Use only the provided source note and generated workflow outputs. '
-        'Do not invent facts. If something is missing or uncertain, say so clearly. '
-        'Give concise, clinically useful answers for a physician reviewing a chart. '
-        'Do not provide a diagnosis; provide chart-grounded observations, possible gaps, and suggested follow-up questions.'
+    # MedGemma / llama.cpp chat templates often expect strict user/assistant alternation.
+    # Avoid a separate `system` role here and instead place instructions in an initial user turn,
+    # followed by a short assistant acknowledgement to preserve alternation.
+    context_prompt = (
+        'You are FacetCare chart chat, a clinical chart assistant for a demo review UI.\n'
+        'Rules:\n'
+        '1) Use only the provided source note and generated workflow outputs.\n'
+        '2) Do not invent facts. If something is missing or uncertain, say so clearly.\n'
+        '3) Give concise, clinically useful answers for a physician reviewing a chart.\n'
+        '4) Do not provide a diagnosis. Provide chart-grounded observations, possible gaps, and suggested follow-up questions.\n\n'
+        f'Patient ID: {patient_id}\n\n'
+        f'Source note preview:\n{note_compact or "[none]"}\n\n'
+        f'Generated workflow outputs (JSON):\n{artifact_json}\n\n'
+        'Acknowledge briefly, then answer subsequent questions using only this context unless updated.'
     )
 
     messages = [
-        {'role': 'system', 'content': system_prompt},
-        {'role': 'user', 'content': (
-            f'Patient ID: {patient_id}\n\n'
-            f'Source note preview:\n{note_compact or "[none]"}\n\n'
-            f'Generated workflow outputs (JSON):\n{artifact_json}\n\n'
-            'Use this as chart context for future questions.'
-        )},
+        {'role': 'user', 'content': context_prompt},
+        {'role': 'assistant', 'content': 'Understood. I will answer using only the provided chart context and will clearly note uncertainty or missing information.'},
     ]
-    messages.extend(recent_turns)
+
+    # Append recent turns, keeping strict user/assistant alternation.
+    for turn in (history or [])[-6:]:
+        if not isinstance(turn, dict):
+            continue
+        u = str(turn.get('user', '') or '').strip()
+        a = str(turn.get('assistant', '') or '').strip()
+        if u:
+            messages.append({'role': 'user', 'content': u})
+        if a:
+            messages.append({'role': 'assistant', 'content': a})
+
     messages.append({'role': 'user', 'content': user_message})
 
     # Try local OpenAI-compatible chat endpoint first.
@@ -1923,8 +1937,9 @@ def results_page():
   <style>
     body { background-color: #f0f4f8; font-family: 'Segoe UI', sans-serif; }
     .brand-bar { background: linear-gradient(90deg, #1a3c5e 0%, #2563a8 100%); padding: 1.1rem 2rem; color: white; }
-    .brand-title { font-size: 1.6rem; font-weight: 700; letter-spacing: 0.03em; }
-    .brand-subtitle { font-size: 0.88rem; opacity: 0.85; }
+    .brand-title-link { color: white; text-decoration: none; font-size: 1.6rem; font-weight: 700; letter-spacing: 0.03em; }
+    .brand-title-link:hover { color: #eef6ff; }
+    .brand-subtitle { font-size: 0.88rem; opacity: 0.82; margin-top: 0.1rem; }
     .card-panel { border: none; border-radius: 12px; box-shadow: 0 4px 24px rgba(30,60,100,0.10); background: white; }
     .metric-card { border-radius: 12px; border: 1px solid #dbe7f5; background: linear-gradient(180deg, #ffffff, #f8fbff); }
     .metric-label { color: #6b7a8d; font-size: 0.76rem; text-transform: uppercase; letter-spacing: 0.06em; font-weight: 600; }
@@ -1949,7 +1964,7 @@ def results_page():
 <div class=\"brand-bar d-flex align-items-center gap-3\">
   <i class=\"bi bi-heart-pulse-fill fs-3\"></i>
   <div>
-    <a class=\"brand-title\" href=\"{{ url_for('dashboard') }}\" style=\"color:white;text-decoration:none;\">FacetCare</a>
+    <a class=\"brand-title-link\" href=\"{{ url_for('dashboard') }}\">FacetCare</a>
     <div class=\"brand-subtitle\">AI-Assisted Clinical Workflow Orchestration</div>
   </div>
   <div class=\"ms-auto d-flex gap-2 flex-wrap\">
