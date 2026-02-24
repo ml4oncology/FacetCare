@@ -1,4 +1,4 @@
-# FacetCare
+# facetcare_project
 
 Plan-driven clinic workflow orchestration with LLM tasks (llama.cpp/vLLM compatible).
 
@@ -11,7 +11,10 @@ Plan-driven clinic workflow orchestration with LLM tasks (llama.cpp/vLLM compati
   - generates clinic-ready artifacts for selected patients only
   - packages everything into a Review Bundle for human review
 
-## Run
-python demo.py or python web_app.py
+## Install
+pip install pydantic openai
 
-Edit demo.py or web_app.py to match your base_url and served model name.
+## Run
+python demo.py
+
+Edit demo.py to match your local llama.cpp base_url and served model name.
