@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import argparse
+import os
+
 from openai import OpenAI
 
 from medflow.llm_client import LLMJsonClient
@@ -11,9 +14,21 @@ from medflow.dedup import JSONFileDedupStore
 
 
 def main() -> None:
-    endpoint = "http://192.168.0.1:888/v1/"
-    client = OpenAI(base_url=endpoint, api_key="")
-    model = "gpt-4.1-mini"  # Replace with your served llama.cpp model name if needed.
+    parser = argparse.ArgumentParser(description="MedFlow CLI runner")
+    parser.add_argument(
+        "--endpoint",
+        default=os.environ.get("MEDFLOW_ENDPOINT", "http://192.168.0.1:888/v1/"),
+        help="LLM API endpoint URL",
+    )
+    parser.add_argument(
+        "--model",
+        default=os.environ.get("MEDFLOW_MODEL", "medgema"),
+        help="Model name served at the endpoint",
+    )
+    args = parser.parse_args()
+
+    client = OpenAI(base_url=args.endpoint, api_key="")
+    model = args.model
 
     llm = LLMJsonClient(client=client, model=model)
     ctx = TaskContext(llm=llm)
