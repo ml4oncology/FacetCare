@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from typing import Any, Dict, List, Literal, Optional
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 class NoteCaptureSchema(BaseModel):
@@ -97,6 +97,7 @@ class CandidatePoolConfig(BaseModel):
     strategy: Literal["all", "recent_notes_only", "keyword_prefilter"] = "all"
     max_candidates: Optional[int] = Field(default=None, ge=1)
     keywords: List[str] = Field(default_factory=list)
+    include_patient_ids: List[str] = Field(default_factory=list)
 
 
 class SelectionConfig(BaseModel):
@@ -104,7 +105,7 @@ class SelectionConfig(BaseModel):
     # source_task is optional. If omitted, runner will auto-pick a reasonable source.
     source_task: Optional[str] = None
     # method controls selection behavior. "first_k" supports non-scored workflows.
-    method: Literal["top_k", "threshold", "threshold_then_top_k", "first_k"] = "top_k"
+    method: Literal["top_k", "threshold", "threshold_then_top_k", "first_k", "random_k"] = "top_k"
     k: int = Field(default=5, ge=1)
     threshold: Optional[float] = Field(default=None, ge=0.0, le=1.0)
 
@@ -139,10 +140,49 @@ class ClinicPlanSchema(BaseModel):
     workflow: Optional[ClinicWorkflowSchema] = None
 
 
+class LongitudinalNoteEntry(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    visit_date: Optional[str] = None
+    source: Optional[str] = None
+    note_text: str
+
+
 class PatientRecord(BaseModel):
     model_config = ConfigDict(extra="forbid")
     patient_id: str
-    longitudinal_notes: str
+    patient_name: Optional[str] = None
+    date_of_birth: Optional[str] = None
+    sex: Optional[str] = None
+    ohip_number: Optional[str] = None
+    address: Optional[str] = None
+    phone: Optional[str] = None
+    longitudinal_notes: str = ""
+    longitudinal_note_entries: List[LongitudinalNoteEntry] = Field(default_factory=list)
+
+    @model_validator(mode="before")
+    @classmethod
+    def _coerce_longitudinal_notes(cls, data: Any) -> Any:
+        if not isinstance(data, dict):
+            return data
+        out = dict(data)
+        notes = str(out.get("longitudinal_notes") or "").strip()
+        entries = out.get("longitudinal_note_entries") or out.get("notes") or []
+        if entries and not notes:
+            parts: List[str] = []
+            for idx, item in enumerate(entries, start=1):
+                if not isinstance(item, dict):
+                    continue
+                vdate = str(item.get("visit_date") or "").strip()
+                src = str(item.get("source") or "progress_note").strip()
+                body = str(item.get("note_text") or item.get("text") or "").strip()
+                if not body:
+                    continue
+                header_bits = [x for x in [vdate, src] if x]
+                header = " | ".join(header_bits) if header_bits else f"note_{idx}"
+                parts.append(f"[{header}]\n{body}")
+            if parts:
+                out["longitudinal_notes"] = "\n\n".join(parts)
+        return out
 
 
 class SelectedPatientBundle(BaseModel):
@@ -153,6 +193,7 @@ class SelectedPatientBundle(BaseModel):
     clinician_summary: Optional[ClinicianSummarySchema] = None
     admin_referral: Optional[AdminReferralSchema] = None
     extra_outputs: Dict[str, Any] = Field(default_factory=dict)
+    artifact_sources: Dict[str, str] = Field(default_factory=dict)
 
 
 class PatientInstructionsSchema(BaseModel):

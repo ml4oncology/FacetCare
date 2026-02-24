@@ -4,6 +4,7 @@ import re
 from typing import Any, Dict, List, Optional
 
 from .llm_client import LLMJsonClient
+from . import prompts
 from .normalizers import (
     coerce_int,
     coerce_probability,
@@ -304,24 +305,11 @@ def build_clinic_plan_from_description(
     default_target_condition: Optional[str] = None,
     default_horizon_months: Optional[int] = None,
 ) -> ClinicPlanSchema:
-    system = (
-        "You are a clinic program designer.\n"
-        "Return exactly one JSON object matching ClinicPlanSchema.\n"
-        "Do not add markdown or commentary.\n\n"
-        "Key rule: do NOT force disease risk scoring if the clinic asks for other tasks.\n"
-        "Only enable tasks that fit the clinic goals.\n\n"
-        "Valid task names are:\n"
-        f"{', '.join(TASK_CATALOG.keys())}\n\n"
-        "constraints.candidate_pool.strategy must be one of: all, recent_notes_only, keyword_prefilter\n"
-        "constraints.selection.method must be one of: top_k, threshold, threshold_then_top_k, first_k\n"
-        "If no scoring task is requested, use selection.method=first_k and selection.source_task=null.\n"
-        "If risk_assessment is enabled, target_condition and horizon_months are usually helpful.\n"
-        "If not a disease-risk workflow, target_condition and horizon_months can be null.\n"
-    )
-    user = (
-        f"Clinic description and goals:\n{clinic_description}\n\n"
-        f"Default target_condition (optional): {default_target_condition}\n"
-        f"Default horizon_months (optional): {default_horizon_months}\n"
+    system, user = prompts.clinic_plan_prompt(
+        clinic_description=clinic_description,
+        default_target_condition=default_target_condition,
+        default_horizon_months=default_horizon_months,
+        valid_task_names=TASK_CATALOG.keys(),
     )
 
     obj = llm.json_object_no_tools(system=system, user=user, temperature=0.0)
