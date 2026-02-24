@@ -32,21 +32,6 @@ class LLMJsonClient:
                 self.client = OpenAI(api_key=api_key)
         self.model = model or os.getenv("OPENAI_MODEL") or os.getenv("MEDFLOW_MODEL") or "gpt-4o-mini"
 
-
-    def _medgemma_safe_messages(self, *, system: str, user: str) -> List[Dict[str, str]]:
-        """
-        Many MedGemma-compatible OpenAI endpoints reject a top-level system role and expect
-        alternating user/assistant turns. Preserve instructions by folding the system text
-        into a single user message.
-        """
-        sys_txt = (system or "").strip()
-        usr_txt = (user or "").strip()
-        if sys_txt:
-            merged = f"[INSTRUCTIONS]\n{sys_txt}\n\n[REQUEST]\n{usr_txt}"
-        else:
-            merged = usr_txt
-        return [{"role": "user", "content": merged}]
-
     @staticmethod
     def _assistant_message_to_dict(msg: Any) -> Dict[str, Any]:
         out: Dict[str, Any] = {"role": "assistant", "content": getattr(msg, "content", None)}
@@ -80,7 +65,7 @@ class LLMJsonClient:
         )
         resp = self.client.chat.completions.create(
             model=self.model,
-            messages=self._medgemma_safe_messages(system=repair_system, user=repair_user),
+            messages=[{"role": "system", "content": repair_system}, {"role": "user", "content": repair_user}],
             temperature=temperature,
         )
         txt = resp.choices[0].message.content or ""
@@ -89,7 +74,7 @@ class LLMJsonClient:
     def json_object_no_tools(self, *, system: str, user: str, temperature: float = 0.0) -> Dict[str, Any]:
         resp = self.client.chat.completions.create(
             model=self.model,
-            messages=self._medgemma_safe_messages(system=system, user=user),
+            messages=[{"role": "system", "content": system}, {"role": "user", "content": user}],
             temperature=temperature,
         )
         txt = resp.choices[0].message.content or ""
@@ -108,7 +93,7 @@ class LLMJsonClient:
         temperature: float = 0.0,
         prefer_new_tools: bool = True,
     ) -> Dict[str, Any]:
-        messages: List[Dict[str, Any]] = [dict(m) for m in self._medgemma_safe_messages(system=system, user=user)]
+        messages: List[Dict[str, Any]] = [{"role": "system", "content": system}, {"role": "user", "content": user}]
         last_text = ""
         tool_by_name = {t.name: t for t in tool_specs}
 

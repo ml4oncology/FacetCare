@@ -369,10 +369,9 @@ def referral_letter_prompt(*, patient_id: str, target: str, urgency: str, recipi
             ["patient_id", "target_condition", "urgency", "recipient", "letter_body", "attachments"],
             extra=(
                 "urgency must be one of: routine, semi-urgent, urgent.\n"
-                "letter_body must be a complete referral letter in a practical clinic format, not just a paragraph.\n"
-                "Use a layout like: clinic header line, DATE, TO, FAX, RE, DOB, OHIP No, Address, Phone, greeting, Reason for Referral, Background, Key Clinical Findings, Investigations Completed, Relevant History & Medications, Request, Sincerely.\n"
-                "If a demographic or contact field is missing, write 'Not available in chart' rather than inventing it.\n"
-                "Use only information present in the supplied chart context and task JSON. Stay factual and note-based."
+                "letter_body should be a full note (typically 1 to 3 short paragraphs), not a sentence fragment.\n"
+                "Include reason for referral, key longitudinal findings, relevant context, and what is being requested from the consultant.\n"
+                "Stay factual and note-based. Avoid unsupported claims or fabricated demographics/results."
             ),
         )
     )

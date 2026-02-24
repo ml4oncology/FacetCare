@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from typing import Any, Dict, List, Literal, Optional
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class NoteCaptureSchema(BaseModel):
@@ -140,49 +140,10 @@ class ClinicPlanSchema(BaseModel):
     workflow: Optional[ClinicWorkflowSchema] = None
 
 
-class LongitudinalNoteEntry(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-    visit_date: Optional[str] = None
-    source: Optional[str] = None
-    note_text: str
-
-
 class PatientRecord(BaseModel):
     model_config = ConfigDict(extra="forbid")
     patient_id: str
-    patient_name: Optional[str] = None
-    date_of_birth: Optional[str] = None
-    sex: Optional[str] = None
-    ohip_number: Optional[str] = None
-    address: Optional[str] = None
-    phone: Optional[str] = None
-    longitudinal_notes: str = ""
-    longitudinal_note_entries: List[LongitudinalNoteEntry] = Field(default_factory=list)
-
-    @model_validator(mode="before")
-    @classmethod
-    def _coerce_longitudinal_notes(cls, data: Any) -> Any:
-        if not isinstance(data, dict):
-            return data
-        out = dict(data)
-        notes = str(out.get("longitudinal_notes") or "").strip()
-        entries = out.get("longitudinal_note_entries") or out.get("notes") or []
-        if entries and not notes:
-            parts: List[str] = []
-            for idx, item in enumerate(entries, start=1):
-                if not isinstance(item, dict):
-                    continue
-                vdate = str(item.get("visit_date") or "").strip()
-                src = str(item.get("source") or "progress_note").strip()
-                body = str(item.get("note_text") or item.get("text") or "").strip()
-                if not body:
-                    continue
-                header_bits = [x for x in [vdate, src] if x]
-                header = " | ".join(header_bits) if header_bits else f"note_{idx}"
-                parts.append(f"[{header}]\n{body}")
-            if parts:
-                out["longitudinal_notes"] = "\n\n".join(parts)
-        return out
+    longitudinal_notes: str
 
 
 class SelectedPatientBundle(BaseModel):
