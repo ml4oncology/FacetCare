@@ -1,0 +1,3020 @@
+{
+  "version": 1,
+  "entries": {
+    "18c2f6b9b2eeb2e610b59a6e74388604bcc2b53198f29b87a59980a274040b45": {
+      "meta": {
+        "cache_schema": 1,
+        "task": "intake_workflow",
+        "patient": "__clinic__",
+        "note_hash": "clinic-level",
+        "plan_hash": "78ccc35ab60f06a5d72822eae6f6ad831b1e24345cdc1a5d01eeb5dcc14d6b13",
+        "task_params_hash": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+        "task_params": {},
+        "model": "medgemma",
+        "prompt_version": "2026-02-23-v3"
+      },
+      "payload": {
+        "clinic_type": "Family Medicine",
+        "clinic_name": "Rural Ontario Family Practice",
+        "note_capture": {
+          "source": "EMR",
+          "format": "free_text",
+          "cadence": "encounter_based"
+        },
+        "review_cadence": {
+          "who_reviews": "Clinical team",
+          "frequency": "weekly",
+          "trigger": "scheduled_review"
+        },
+        "referral_pathway": {
+          "internal": "Internal clinician triage",
+          "external": "Refer to external service as needed",
+          "urgent_flags": [
+            "red flag symptoms",
+            "abnormal imaging",
+            "critical labs"
+          ]
+        },
+        "staffing_constraints": [
+          "Clinician review limited to top 10 patients per week. Assumes availability of administrative staff for referral processing."
+        ],
+        "goals": [
+          "Identify patients at elevated risk of pancreatic cancer within 2 years based on EMR notes. Generate risk assessment, clinician chart summary, admin referral payload, and patient instructions. Avoid repeat identification within 6 months. Provide decision support, not diagnosis."
+        ],
+        "guardrails": {
+          "privacy": "Use minimum necessary PHI",
+          "safety": "Decision support only, no diagnosis",
+          "logging": "No PHI in logs"
+        }
+      },
+      "saved_at": 1771926683.6410897,
+      "last_accessed_at": 1771929434.0640166
+    },
+    "a0100e73696579a906e48a9690b10c171f0939559a2c291e7631d0c8e996b571": {
+      "meta": {
+        "cache_schema": 1,
+        "task": "risk_assessment",
+        "patient": "P0001",
+        "note_hash": "de5d24c4aad96e451c7d14491b4316480fb2d3aa7abab55b2019b145f90d726d",
+        "plan_hash": "78ccc35ab60f06a5d72822eae6f6ad831b1e24345cdc1a5d01eeb5dcc14d6b13",
+        "task_params_hash": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+        "task_params": {},
+        "model": "medgemma",
+        "prompt_version": "2026-02-23-v3"
+      },
+      "payload": {
+        "patient_id": "P0001",
+        "target_condition": "pancreatic_cancer",
+        "horizon_months": 24,
+        "risk_probability": 0.25,
+        "risk_level": "moderate",
+        "key_risk_factors": [
+          "Unintentional weight loss documented across multiple visits (2020-05-19, 2021-01-14, 2021-05-26)",
+          "New onset/worsening diabetes (A1c increased compared with prior on multiple occasions)",
+          "Persistent epigastric discomfort, nausea, bloating, early satiety",
+          "Pruritus documented (2019-09-08, 2020-08-25)",
+          "Intermittent back pain documented (2019-02-08, 2020-01-05, 2021-05-26)",
+          "Decreased appetite documented (2019-09-08)",
+          "Mildly abnormal LFTs noted (2019-02-08)",
+          "Multiple requests for abdominal imaging (ultrasound, CT) with unclear completion status"
+        ],
+        "key_protective_factors": [
+          "No explicit jaundice documented",
+          "No critical CBC abnormalities documented (2020-01-05, 2021-05-26)"
+        ],
+        "recommended_next_steps": [
+          "Clarify status of requested abdominal imaging (ultrasound, CT)",
+          "Arrange clinician assessment for persistent alarm symptoms (weight loss, abdominal discomfort, pruritus)",
+          "Review longitudinal A1c trend and diabetes management",
+          "Consider referral to gastroenterology or oncology based on assessment findings"
+        ],
+        "safety_notes": [
+          "Risk estimate is note-based and not diagnostic. Multiple concerning symptoms are present but lack definitive imaging or workup completion. Conservative estimate due to incomplete data."
+        ]
+      },
+      "saved_at": 1771926744.4522822,
+      "last_accessed_at": 1771926744.4522822
+    },
+    "3304a0512d20c08da84f47863a68f644122fffc603e655ce29fe7c5a5ea258b4": {
+      "meta": {
+        "cache_schema": 1,
+        "task": "risk_assessment",
+        "patient": "P0002",
+        "note_hash": "c7a74613bc167ded08dfa31b9fff9db6dca5b65c8e81a5950a48a52c107bc982",
+        "plan_hash": "78ccc35ab60f06a5d72822eae6f6ad831b1e24345cdc1a5d01eeb5dcc14d6b13",
+        "task_params_hash": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+        "task_params": {},
+        "model": "medgemma",
+        "prompt_version": "2026-02-23-v3"
+      },
+      "payload": {
+        "patient_id": "P0002",
+        "target_condition": "pancreatic_cancer",
+        "horizon_months": 24,
+        "risk_probability": 0.25,
+        "risk_level": "moderate",
+        "key_risk_factors": [
+          "Unintentional weight loss documented 2020-05-11",
+          "New-onset diabetes documented 2020-12-21",
+          "Persistent dyspepsia documented across multiple visits",
+          "Intermittent back pain documented across multiple visits",
+          "Mildly abnormal LFTs documented across multiple visits",
+          "Early satiety documented 2019-05-02 and 2021-05-18",
+          "Dark urine documented 2019-05-02, 2019-09-13, 2020-08-27",
+          "Decreased appetite documented 2021-05-18",
+          "Bloating documented 2020-08-27",
+          "Age 65 years at time of notes",
+          "No recent imaging available in chart across multiple visits",
+          "CT abdomen discussed but completion status unclear 2019-09-13",
+          "MRI deferred pending specialist advice 2019-05-02 and 2020-08-27"
+        ],
+        "key_protective_factors": [
+          "Lipase within normal range per note 2020-08-27 and 2021-05-18",
+          "No critical CBC abnormalities documented 2020-01-07"
+        ],
+        "recommended_next_steps": [
+          "Review timing and results of prior abdominal imaging (CT/MRI)",
+          "Arrange clinician assessment for persistent alarm symptoms (weight loss, new diabetes, dyspepsia, back pain)",
+          "Consider further investigation for pancreatic pathology given constellation of symptoms and risk factors",
+          "Follow-up on pending investigations mentioned 2021-05-18"
+        ],
+        "safety_notes": [
+          "Risk estimate is note-based and not diagnostic. Multiple concerning symptoms are present, but specific diagnosis is not made. Lack of recent imaging is a concern."
+        ]
+      },
+      "saved_at": 1771926779.843414,
+      "last_accessed_at": 1771926779.843414
+    },
+    "924b803f305314516d4809c825c8e5a7c147277d5e25012a6866baaed1a16cd4": {
+      "meta": {
+        "cache_schema": 1,
+        "task": "risk_assessment",
+        "patient": "P0003",
+        "note_hash": "64b41557cd5e0f90cd271df56f0541748804808a92ab0c10b775ea7a6f873f17",
+        "plan_hash": "78ccc35ab60f06a5d72822eae6f6ad831b1e24345cdc1a5d01eeb5dcc14d6b13",
+        "task_params_hash": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+        "task_params": {},
+        "model": "medgemma",
+        "prompt_version": "2026-02-23-v3"
+      },
+      "payload": {
+        "patient_id": "P0003",
+        "target_condition": "pancreatic_cancer",
+        "horizon_months": 24,
+        "risk_probability": 0.25,
+        "risk_level": "moderate",
+        "key_risk_factors": [
+          "Persistent dyspepsia",
+          "Dark urine documented across visits",
+          "New-onset diabetes at age 69",
+          "Decreased appetite documented",
+          "Unresolved abdominal imaging requests",
+          "Unclear status of CT abdomen"
+        ],
+        "key_protective_factors": [
+          "Lipase within normal range per note",
+          "No explicit jaundice documented"
+        ],
+        "recommended_next_steps": [
+          "Review status of abdominal imaging (ultrasound, CT)",
+          "Arrange clinician assessment for persistent symptoms and new diabetes",
+          "Follow up on pending investigations (Ferritin)"
+        ],
+        "safety_notes": [
+          "Risk estimate is note-based and not diagnostic. Conservative estimate due to incomplete investigation status."
+        ]
+      },
+      "saved_at": 1771926795.0815506,
+      "last_accessed_at": 1771926795.0815506
+    },
+    "da425f383f0d2207e3bd4f79928d5c91668258553363292a7206591793577ebf": {
+      "meta": {
+        "cache_schema": 1,
+        "task": "risk_assessment",
+        "patient": "P0004",
+        "note_hash": "1f83148ce9a7eb624686cccd92fcb4c62740acdc4b006a285ba0b7535dda593b",
+        "plan_hash": "78ccc35ab60f06a5d72822eae6f6ad831b1e24345cdc1a5d01eeb5dcc14d6b13",
+        "task_params_hash": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+        "task_params": {},
+        "model": "medgemma",
+        "prompt_version": "2026-02-23-v3"
+      },
+      "payload": {
+        "patient_id": "P0004",
+        "target_condition": "pancreatic_cancer",
+        "horizon_months": 24,
+        "risk_probability": 0.25,
+        "risk_level": "moderate",
+        "key_risk_factors": [
+          "Unintentional weight loss documented across multiple visits (2019-05-03, 2020-08-27)",
+          "New-onset diabetes noted (2019-08-30)",
+          "Worsening glycemia (A1c increased) noted (2019-08-30, 2020-04-21)",
+          "Pruritus documented (2019-05-03, 2020-04-21)",
+          "Dark urine documented (2020-04-21)",
+          "Epigastric discomfort documented (2020-11-26, 2021-04-28)",
+          "Intermittent back pain documented (2019-12-11, 2021-04-28)",
+          "Mildly abnormal LFTs documented (2019-05-03, 2020-08-27)",
+          "Age > 65 (DOB 1951-06-25)"
+        ],
+        "key_protective_factors": [
+          "No explicit jaundice documented",
+          "No recent imaging available in chart (2019-12-11)"
+        ],
+        "recommended_next_steps": [
+          "Review timing and results of prior abdominal imaging (CT abdomen discussed multiple times)",
+          "Arrange clinician assessment for persistent alarm symptoms (weight loss, back pain, epigastric discomfort)",
+          "Follow up on pending investigations (Ferritin, Abdominal ultrasound)"
+        ],
+        "safety_notes": [
+          "Risk estimate is note-based and not diagnostic. Multiple concerning symptoms are present, but lack of imaging limits assessment."
+        ]
+      },
+      "saved_at": 1771926828.3955777,
+      "last_accessed_at": 1771926828.3955777
+    },
+    "c7503d841095df1030335c6412b091851467ba4086692b5404c7004b57f84800": {
+      "meta": {
+        "cache_schema": 1,
+        "task": "risk_assessment",
+        "patient": "P0005",
+        "note_hash": "bf2b108fa790117be01afefa2a2f7700c01b78c3cb0fcd92463bca0d5761b2ef",
+        "plan_hash": "78ccc35ab60f06a5d72822eae6f6ad831b1e24345cdc1a5d01eeb5dcc14d6b13",
+        "task_params_hash": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+        "task_params": {},
+        "model": "medgemma",
+        "prompt_version": "2026-02-23-v3"
+      },
+      "payload": {
+        "patient_id": "P0005",
+        "target_condition": "pancreatic_cancer",
+        "horizon_months": 24,
+        "risk_probability": 0.25,
+        "risk_level": "moderate",
+        "key_risk_factors": [
+          "Unintentional weight loss documented across multiple visits (2019-05-02, 2021-05-19)",
+          "New-onset diabetes noted (2020-09-14)",
+          "Persistent epigastric discomfort/dyspepsia (2019-09-19, 2020-09-14, 2021-05-19)",
+          "Mildly abnormal LFTs noted (2021-05-19, 2021-09-08)",
+          "Pruritus noted (2021-09-08)",
+          "Dark urine noted (2019-05-02)",
+          "Decreased appetite noted (2019-05-02, 2019-12-25)",
+          "Unresolved abdominal imaging (CT abdomen discussed multiple times, completion status unclear)"
+        ],
+        "key_protective_factors": [
+          "Lipase within normal range per notes (2020-05-02, 2020-09-14)",
+          "No explicit jaundice documented",
+          "No critical CBC abnormalities documented (2019-12-25, 2020-12-20)"
+        ],
+        "recommended_next_steps": [
+          "Review prior imaging results, including CT abdomen status",
+          "Arrange clinician assessment for persistent alarm symptoms (weight loss, new diabetes, dyspepsia, pruritus)",
+          "Follow up on pending investigations (LFTs, MRI)",
+          "Consider specialist referral given persistent symptoms and new diabetes"
+        ],
+        "safety_notes": [
+          "Risk estimate is note-based and not diagnostic. Multiple concerning symptoms are present, but specific diagnosis is not made. Conservative estimate due to lack of definitive imaging or lab results."
+        ]
+      },
+      "saved_at": 1771926861.3778007,
+      "last_accessed_at": 1771926861.3778007
+    },
+    "7bb983842b9bdb89c399fafff82d9c42d6ca75d272b40e9a656266874d5d741e": {
+      "meta": {
+        "cache_schema": 1,
+        "task": "risk_assessment",
+        "patient": "P0006",
+        "note_hash": "cb33a3dfadc271f88c6778baf5b1b5deb45138ff9187ff10d409914dde9b5c81",
+        "plan_hash": "78ccc35ab60f06a5d72822eae6f6ad831b1e24345cdc1a5d01eeb5dcc14d6b13",
+        "task_params_hash": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+        "task_params": {},
+        "model": "medgemma",
+        "prompt_version": "2026-02-23-v3"
+      },
+      "payload": {
+        "patient_id": "P0006",
+        "target_condition": "pancreatic_cancer",
+        "horizon_months": 24,
+        "risk_probability": 0.25,
+        "risk_level": "moderate",
+        "key_risk_factors": [
+          "Unintentional weight loss documented across multiple visits (2019-12-09, 2020-05-12, 2021-01-08)",
+          "Persistent nausea documented across multiple visits (2019-04-13, 2019-09-14, 2019-12-09, 2020-05-12)",
+          "Early satiety documented across multiple visits (2019-04-13, 2020-08-09)",
+          "Decreased appetite documented (2021-01-08)",
+          "Mildly abnormal LFTs noted on multiple occasions (2019-12-09, 2020-05-12)",
+          "Dark urine noted (2020-05-12)",
+          "Intermittent back pain noted (2020-08-09)",
+          "Age 80 years old"
+        ],
+        "key_protective_factors": [
+          "No explicit jaundice documented",
+          "No recent imaging available in chart (2021-01-08)"
+        ],
+        "recommended_next_steps": [
+          "Review prior imaging results (CT abdomen, ultrasound, MRI) if available",
+          "Arrange clinician assessment for persistent alarm symptoms (weight loss, nausea, early satiety)",
+          "Consider further investigation based on clinical assessment and prior results"
+        ],
+        "safety_notes": [
+          "Risk estimate is note-based and not diagnostic. Multiple concerning symptoms are present, but definitive diagnosis requires further investigation. Imaging status is unclear."
+        ]
+      },
+      "saved_at": 1771926895.9410636,
+      "last_accessed_at": 1771926895.9410636
+    },
+    "070e0418e24a9c454eab4d6de460908751931e7b94e22847563d48abbaea604e": {
+      "meta": {
+        "cache_schema": 1,
+        "task": "risk_assessment",
+        "patient": "P0007",
+        "note_hash": "78896c3b7fcc3216ff0c0241ff3659d472976f2dacd2a6826d8b9d0ea32a64fc",
+        "plan_hash": "78ccc35ab60f06a5d72822eae6f6ad831b1e24345cdc1a5d01eeb5dcc14d6b13",
+        "task_params_hash": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+        "task_params": {},
+        "model": "medgemma",
+        "prompt_version": "2026-02-23-v3"
+      },
+      "payload": {
+        "patient_id": "P0007",
+        "target_condition": "pancreatic_cancer",
+        "horizon_months": 24,
+        "risk_probability": 0.25,
+        "risk_level": "moderate",
+        "key_risk_factors": [
+          "Unintentional weight loss documented across visits",
+          "New-onset diabetes documented",
+          "Family history of pancreatic or GI malignancy documented in a first-degree relative",
+          "Persistent nausea documented across visits",
+          "Intermittent back pain documented across visits",
+          "Dark urine documented",
+          "Bloating documented",
+          "Dyspepsia documented",
+          "Pruritus documented",
+          "Increased A1c compared with prior"
+        ],
+        "key_protective_factors": [
+          "No explicit jaundice documented"
+        ],
+        "recommended_next_steps": [
+          "Review timing and findings of prior abdominal imaging",
+          "Arrange clinician assessment for persistent alarm symptoms",
+          "Follow up on pending investigations (CMP, Abdominal ultrasound)"
+        ],
+        "safety_notes": [
+          "Risk estimate is note-based and not diagnostic. Multiple concerning symptoms are present, but no definitive diagnosis is made in the notes."
+        ]
+      },
+      "saved_at": 1771926918.6440794,
+      "last_accessed_at": 1771926918.6440794
+    },
+    "90bd13e4c35ede6143a08d99c40e12d83a8e782f9bf3580eeab46823f1441ebc": {
+      "meta": {
+        "cache_schema": 1,
+        "task": "risk_assessment",
+        "patient": "P0008",
+        "note_hash": "63655b7210233716296c9dc3afe3068c3bd6d464b29bbd55153678616d6c709c",
+        "plan_hash": "78ccc35ab60f06a5d72822eae6f6ad831b1e24345cdc1a5d01eeb5dcc14d6b13",
+        "task_params_hash": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+        "task_params": {},
+        "model": "medgemma",
+        "prompt_version": "2026-02-23-v3"
+      },
+      "payload": {
+        "patient_id": "P0008",
+        "target_condition": "pancreatic_cancer",
+        "horizon_months": 24,
+        "risk_probability": 0.25,
+        "risk_level": "moderate",
+        "key_risk_factors": [
+          "New-onset diabetes documented in 2019",
+          "Unintentional weight loss documented in 2020",
+          "Persistent epigastric discomfort documented across visits",
+          "Decreased appetite documented across visits",
+          "Pruritus documented across visits",
+          "Dark urine documented in 2019 and 2021",
+          "Mildly abnormal LFTs documented across visits",
+          "Intermittent back pain documented in 2021",
+          "Early satiety documented in 2020",
+          "Nausea documented in 2020 and 2021",
+          "Age 48 at onset of symptoms",
+          "CT abdomen discussed; completion status unclear on multiple occasions"
+        ],
+        "key_protective_factors": [
+          "No explicit jaundice documented",
+          "No family history mentioned in notes"
+        ],
+        "recommended_next_steps": [
+          "Review prior imaging results, including CT abdomen completion status",
+          "Arrange clinician assessment for persistent alarm symptoms and new-onset diabetes",
+          "Consider further investigation based on clinical assessment and imaging review"
+        ],
+        "safety_notes": [
+          "Risk estimate is note-based and not diagnostic. Multiple concerning symptoms are present, but no definitive diagnosis is made in the notes."
+        ]
+      },
+      "saved_at": 1771926939.9722633,
+      "last_accessed_at": 1771926939.9722633
+    },
+    "97fafee9fcd8ccc6eb2acad4d3e76e8b6b29ecf534d107669ffa10f8f1edf73d": {
+      "meta": {
+        "cache_schema": 1,
+        "task": "risk_assessment",
+        "patient": "P0009",
+        "note_hash": "6f18a18aee6e55a82ee0f5c85810c42d1f1bb9252bcbedf609612f629f8f129e",
+        "plan_hash": "78ccc35ab60f06a5d72822eae6f6ad831b1e24345cdc1a5d01eeb5dcc14d6b13",
+        "task_params_hash": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+        "task_params": {},
+        "model": "medgemma",
+        "prompt_version": "2026-02-23-v3"
+      },
+      "payload": {
+        "patient_id": "P0009",
+        "target_condition": "pancreatic_cancer",
+        "horizon_months": 24,
+        "risk_probability": 0.25,
+        "risk_level": "moderate",
+        "key_risk_factors": [
+          "Unintentional weight loss documented across visits",
+          "Decreased appetite documented across visits",
+          "Early satiety documented across visits",
+          "Epigastric discomfort documented across visits",
+          "Dark urine documented in 2020-04-11",
+          "Pruritus documented in 2019-04-25",
+          "Age 68 at first note",
+          "Family history not documented",
+          "Care gaps in imaging (CT abdomen ordered but completion/report unclear)"
+        ],
+        "key_protective_factors": [
+          "Lipase within normal range documented across visits",
+          "No explicit jaundice documented",
+          "No critical CBC abnormalities documented"
+        ],
+        "recommended_next_steps": [
+          "Review prior CT abdomen status and results if available",
+          "Follow up on abdominal ultrasound results",
+          "Arrange clinician assessment for persistent alarm symptoms (weight loss, appetite change, early satiety)",
+          "Consider further investigation based on ultrasound findings and clinical picture"
+        ],
+        "safety_notes": [
+          "Risk estimate is note-based and not diagnostic. Multiple concerning symptoms are present, but specific diagnosis is not made. Normal lipase does not rule out pancreatic pathology."
+        ]
+      },
+      "saved_at": 1771926960.450856,
+      "last_accessed_at": 1771926960.450856
+    },
+    "9d118e9b9230aaa8e00c3d3cbd9d9149fa2994562fb7af125636b77dc004c6cb": {
+      "meta": {
+        "cache_schema": 1,
+        "task": "risk_assessment",
+        "patient": "P0010",
+        "note_hash": "443dc326465a57a09b28e7e7867aa7fe6b42ddbff1c6da0903ebd2a35b2e8f2f",
+        "plan_hash": "78ccc35ab60f06a5d72822eae6f6ad831b1e24345cdc1a5d01eeb5dcc14d6b13",
+        "task_params_hash": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+        "task_params": {},
+        "model": "medgemma",
+        "prompt_version": "2026-02-23-v3"
+      },
+      "payload": {
+        "patient_id": "P0010",
+        "target_condition": "pancreatic_cancer",
+        "horizon_months": 24,
+        "risk_probability": 0.25,
+        "risk_level": "moderate",
+        "key_risk_factors": [
+          "New-onset diabetes documented 2020-04-03",
+          "Progressive weight loss suggested by decreased appetite (2019-11-26) and early satiety (2019-07-10, 2020-07-08, 2021-03-21)",
+          "Persistent pruritus (2019-07-10, 2020-07-08, 2021-03-21, 2021-07-21)",
+          "Epigastric discomfort/dyspepsia (2019-07-10, 2020-11-29)",
+          "Intermittent back pain (2020-04-03)",
+          "Increasing A1c (2020-07-08, 2020-11-29)",
+          "Unresolved workup/imaging status unclear (CT abdomen discussed 2020-11-29, 2021-07-21)"
+        ],
+        "key_protective_factors": [
+          "Lipase within normal range per note (2020-04-03)",
+          "No explicit jaundice documented"
+        ],
+        "recommended_next_steps": [
+          "Review timing and results of prior abdominal imaging",
+          "Arrange clinician assessment for persistent alarm symptoms including new-onset diabetes, weight loss indicators, and pruritus",
+          "Follow up on status of CT abdomen discussed in 2020-11-29 and 2021-07-21"
+        ],
+        "safety_notes": [
+          "Risk estimate is note-based and not diagnostic. Multiple concerning symptoms are present, but lack of imaging and definitive workup limits certainty."
+        ]
+      },
+      "saved_at": 1771926993.0335782,
+      "last_accessed_at": 1771926993.0335782
+    },
+    "303ec5b3441fac3c308b8803025a897097886c0f9446d9668286c5bee8e20f0a": {
+      "meta": {
+        "cache_schema": 1,
+        "task": "risk_assessment",
+        "patient": "P0011",
+        "note_hash": "ddefc4d5a0123f6a2485f4bb5831ab209e7c2520b923765c96d96088fe4d856a",
+        "plan_hash": "78ccc35ab60f06a5d72822eae6f6ad831b1e24345cdc1a5d01eeb5dcc14d6b13",
+        "task_params_hash": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+        "task_params": {},
+        "model": "medgemma",
+        "prompt_version": "2026-02-23-v3"
+      },
+      "payload": {
+        "patient_id": "P0011",
+        "target_condition": "pancreatic_cancer",
+        "horizon_months": 24,
+        "risk_probability": 0.25,
+        "risk_level": "moderate",
+        "key_risk_factors": [
+          "Persistent early satiety documented across multiple visits (2019-05-11, 2019-09-19, 2021-05-13)",
+          "Persistent bloating documented across multiple visits (2019-05-11, 2020-12-24)",
+          "Persistent decreased appetite documented across multiple visits (2020-01-22, 2020-04-26)",
+          "Persistent intermittent back pain documented across multiple visits (2020-01-22, 2020-04-26, 2020-08-21)",
+          "Persistent dark urine documented across multiple visits (2019-09-19, 2020-12-24)",
+          "Persistent mild cholestatic LFT pattern noted across multiple visits (2019-09-19, 2020-01-22, 2020-04-26, 2020-08-21, 2020-12-24, 2021-05-13)",
+          "Type 2 diabetes documented (2019-05-11, 2019-09-19, 2020-01-22, 2020-04-26, 2020-08-21, 2020-12-24, 2021-05-13)",
+          "Age 51 years (2019-05-11)",
+          "Pruritus documented (2019-05-11)",
+          "Nausea documented (2020-08-21, 2021-05-13)",
+          "Epigastric discomfort documented (2019-05-11)"
+        ],
+        "key_protective_factors": [
+          "CBC reviewed; no critical abnormalities documented (2019-05-11, 2020-08-21)",
+          "Lipase within normal range per note (2021-05-13)",
+          "No explicit jaundice documented",
+          "No recent imaging available in chart (2020-12-24)"
+        ],
+        "recommended_next_steps": [
+          "Review trend of LFTs and ferritin results",
+          "Arrange clinician assessment for persistent alarm symptoms (early satiety, decreased appetite, back pain, dark urine)",
+          "Consider abdominal imaging (MRI or CT) given persistent symptoms and cholestatic LFT pattern despite prior deferrals"
+        ],
+        "safety_notes": [
+          "Risk estimate is note-based and not diagnostic. Multiple persistent symptoms and cholestatic LFTs raise concern, but imaging has been deferred. Further investigation is warranted."
+        ]
+      },
+      "saved_at": 1771927040.6052532,
+      "last_accessed_at": 1771927040.6052532
+    },
+    "3bde37e2fb98becb86755a19263e9be148024d8842da0b868e0020f5878d1ed4": {
+      "meta": {
+        "cache_schema": 1,
+        "task": "risk_assessment",
+        "patient": "P0012",
+        "note_hash": "8b3854e6d342c08b91aab385f2bf2d9dddc27441c06cd40bf1e7f4aefb0bc483",
+        "plan_hash": "78ccc35ab60f06a5d72822eae6f6ad831b1e24345cdc1a5d01eeb5dcc14d6b13",
+        "task_params_hash": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+        "task_params": {},
+        "model": "medgemma",
+        "prompt_version": "2026-02-23-v3"
+      },
+      "payload": {
+        "patient_id": "P0012",
+        "target_condition": "pancreatic_cancer",
+        "horizon_months": 24,
+        "risk_probability": 0.25,
+        "risk_level": "moderate",
+        "key_risk_factors": [
+          "Unintentional weight loss documented across visits",
+          "New-onset diabetes noted in 2020",
+          "Persistent dyspepsia documented across visits",
+          "Decreased appetite documented across visits",
+          "Intermittent back pain documented across visits",
+          "Pruritus noted in 2021",
+          "Age > 65 years old"
+        ],
+        "key_protective_factors": [
+          "Lipase within normal range per notes",
+          "No explicit jaundice documented",
+          "No critical CBC abnormalities documented"
+        ],
+        "recommended_next_steps": [
+          "Review timing and results of prior abdominal imaging (ultrasound, CT)",
+          "Arrange clinician assessment for persistent alarm symptoms (weight loss, dyspepsia, decreased appetite, back pain)",
+          "Consider specialist referral based on assessment",
+          "Follow-up on pending investigations (Ferritin, MRI)"
+        ],
+        "safety_notes": [
+          "Risk estimate is note-based and not diagnostic. Multiple concerning symptoms are present, but specific diagnostic workup status is unclear from notes. Conservative estimate due to incomplete information."
+        ]
+      },
+      "saved_at": 1771927079.0937548,
+      "last_accessed_at": 1771927079.0937548
+    },
+    "819947533e38cf8c13b92956374d19f2bad6f2ee5c0de71c24d9837a25deb743": {
+      "meta": {
+        "cache_schema": 1,
+        "task": "risk_assessment",
+        "patient": "P0013",
+        "note_hash": "105bc7f6261e281c73601d43c09f16a99161fe33feaaf2735cba7958fca1cc0c",
+        "plan_hash": "78ccc35ab60f06a5d72822eae6f6ad831b1e24345cdc1a5d01eeb5dcc14d6b13",
+        "task_params_hash": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+        "task_params": {},
+        "model": "medgemma",
+        "prompt_version": "2026-02-23-v3"
+      },
+      "payload": {
+        "patient_id": "P0013",
+        "target_condition": "pancreatic_cancer",
+        "horizon_months": 24,
+        "risk_probability": 0.25,
+        "risk_level": "moderate",
+        "key_risk_factors": [
+          "Age 82",
+          "New-onset diabetes",
+          "Progressive unintentional weight loss",
+          "Decreased appetite",
+          "Epigastric discomfort",
+          "Dark urine",
+          "Pruritus",
+          "Intermittent back pain",
+          "Worsening glycemia (increased A1c)"
+        ],
+        "key_protective_factors": [
+          "No explicit jaundice documented",
+          "No critical CBC abnormalities documented"
+        ],
+        "recommended_next_steps": [
+          "Review status of abdominal imaging (ultrasound, CT)",
+          "Arrange clinician assessment for persistent symptoms (weight loss, back pain, dark urine, pruritus)",
+          "Follow up on specialist advice regarding MRI"
+        ],
+        "safety_notes": [
+          "Risk estimate is note-based and not diagnostic. Symptoms are non-specific and could have multiple causes. Further investigation is needed."
+        ]
+      },
+      "saved_at": 1771927101.3374922,
+      "last_accessed_at": 1771927101.3374922
+    },
+    "0243f7fe008749b740a7fb89834516e8685755ada897a5c7fb15577021618669": {
+      "meta": {
+        "cache_schema": 1,
+        "task": "risk_assessment",
+        "patient": "P0014",
+        "note_hash": "9fa36f7c93d36a7139a435827de9f3494d2d172bdf4aef5c2f90955dc0175556",
+        "plan_hash": "78ccc35ab60f06a5d72822eae6f6ad831b1e24345cdc1a5d01eeb5dcc14d6b13",
+        "task_params_hash": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+        "task_params": {},
+        "model": "medgemma",
+        "prompt_version": "2026-02-23-v3"
+      },
+      "payload": {
+        "patient_id": "P0014",
+        "target_condition": "pancreatic_cancer",
+        "horizon_months": 24,
+        "risk_probability": 0.25,
+        "risk_level": "moderate",
+        "key_risk_factors": [
+          "Unintentional weight loss documented",
+          "Decreased appetite documented",
+          "Epigastric discomfort documented",
+          "Family history of pancreatic or GI malignancy in a first-degree relative",
+          "Dark urine documented",
+          "Pruritus documented",
+          "Nausea documented",
+          "Bloating documented",
+          "Dyspepsia documented",
+          "Early satiety documented",
+          "Unclear status of prior CT abdomen"
+        ],
+        "key_protective_factors": [
+          "No clear protective factors captured in available notes"
+        ],
+        "recommended_next_steps": [
+          "Review prior imaging, including status of CT abdomen",
+          "Arrange clinician assessment for persistent symptoms (weight loss, appetite change, abdominal discomfort, dark urine)",
+          "Consider further investigation based on clinical assessment"
+        ],
+        "safety_notes": [
+          "Risk estimate is note-based and not diagnostic. Multiple non-specific symptoms are present. Family history is a significant factor. Further investigation is warranted."
+        ]
+      },
+      "saved_at": 1771927123.4578485,
+      "last_accessed_at": 1771927123.4578485
+    },
+    "5f1380d2f6c5b200539503334815dd0fc67237eff31450ca71f4f6c73fa9fcee": {
+      "meta": {
+        "cache_schema": 1,
+        "task": "risk_assessment",
+        "patient": "P0015",
+        "note_hash": "6f8b96563145f60b846c62d95cb25df2c1e9c81e6675578b2d87718282d5ee49",
+        "plan_hash": "78ccc35ab60f06a5d72822eae6f6ad831b1e24345cdc1a5d01eeb5dcc14d6b13",
+        "task_params_hash": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+        "task_params": {},
+        "model": "medgemma",
+        "prompt_version": "2026-02-23-v3"
+      },
+      "payload": {
+        "patient_id": "P0015",
+        "target_condition": "pancreatic_cancer",
+        "horizon_months": 24,
+        "risk_probability": 0.25,
+        "risk_level": "moderate",
+        "key_risk_factors": [
+          "Unintentional weight loss documented 2020-09-21",
+          "Early satiety documented 2019-05-26, 2020-05-08",
+          "Intermittent back pain documented 2019-05-26, 2020-01-23, 2020-09-21, 2021-01-17",
+          "Epigastric discomfort documented 2019-09-15, 2021-05-17",
+          "Pruritus documented 2019-05-26",
+          "Dyspepsia documented 2020-05-08",
+          "Bloating documented 2019-05-26, 2019-09-15, 2021-05-17",
+          "Mildly abnormal LFTs documented 2020-09-21",
+          "Increasing A1c documented 2019-09-15, 2020-01-23",
+          "Age 56 at first note (DOB 1969-03-24)",
+          "MRI deferred pending specialist advice multiple times"
+        ],
+        "key_protective_factors": [
+          "No explicit jaundice documented",
+          "No critical CBC abnormalities documented 2021-05-17"
+        ],
+        "recommended_next_steps": [
+          "Review timing and results of prior abdominal imaging (CT, MRI, Ultrasound)",
+          "Arrange clinician assessment for persistent alarm symptoms (weight loss, back pain, early satiety)",
+          "Follow up on pending investigations (Ferritin, LFTs, CMP)",
+          "Consider specialist referral given persistent symptoms and deferred imaging"
+        ],
+        "safety_notes": [
+          "Risk estimate is note-based and not diagnostic. Multiple symptoms are non-specific but persistent. Lack of definitive imaging is a concern."
+        ]
+      },
+      "saved_at": 1771927193.1960514,
+      "last_accessed_at": 1771927193.1960514
+    },
+    "a4686e5f7e720b90f196787c76b529fabf6260910ed426b5717fcb9c1c1b01ca": {
+      "meta": {
+        "cache_schema": 1,
+        "task": "risk_assessment",
+        "patient": "P0016",
+        "note_hash": "cfe0a24145b3471229cb98ecae60b6ba2e6c872a6bc96c96b29799aa70a161c9",
+        "plan_hash": "78ccc35ab60f06a5d72822eae6f6ad831b1e24345cdc1a5d01eeb5dcc14d6b13",
+        "task_params_hash": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+        "task_params": {},
+        "model": "medgemma",
+        "prompt_version": "2026-02-23-v3"
+      },
+      "payload": {
+        "patient_id": "P0016",
+        "target_condition": "pancreatic_cancer",
+        "horizon_months": 24,
+        "risk_probability": 0.25,
+        "risk_level": "moderate",
+        "key_risk_factors": [
+          "New-onset diabetes documented 2020-05-17",
+          "Persistent dyspepsia documented across multiple visits (2019-12-22, 2020-09-10, 2020-12-15, 2021-04-19)",
+          "Pruritus documented across multiple visits (2019-12-22, 2020-05-17, 2021-08-23)",
+          "Intermittent back pain documented across multiple visits (2019-12-22, 2020-12-15)",
+          "Dark urine documented 2021-12-12",
+          "Bloating documented 2021-12-12",
+          "Mildly abnormal LFTs documented 2020-05-17, 2020-12-15",
+          "Age 69 at first note (2019-12-22)",
+          "Unclear status of prior CT abdomen (2020-05-17, 2021-04-19)",
+          "No recent imaging available in chart (2020-09-10, 2020-12-15, 2021-08-23)"
+        ],
+        "key_protective_factors": [
+          "No explicit jaundice documented",
+          "No critical CBC abnormalities documented 2021-12-12"
+        ],
+        "recommended_next_steps": [
+          "Review timing and findings of prior abdominal imaging (ultrasound, CT)",
+          "Arrange clinician assessment for persistent dyspepsia, pruritus, and new-onset diabetes",
+          "Follow up on pending investigations (LFTs, Ferritin)",
+          "Consider further investigation for biliary obstruction given dark urine and pruritus"
+        ],
+        "safety_notes": [
+          "Risk estimate is note-based and not diagnostic",
+          "Multiple concerning symptoms present, warranting further investigation"
+        ]
+      },
+      "saved_at": 1771927266.639089,
+      "last_accessed_at": 1771927266.639089
+    },
+    "9384a7eefec1f2f35b7c6e839c1e16e6405ebdabe0c7067d3bdc862ff5628b35": {
+      "meta": {
+        "cache_schema": 1,
+        "task": "risk_assessment",
+        "patient": "P0017",
+        "note_hash": "483ca03d71d8ee70f19891c0bf4f2a376f298e8217018d363d4a1e97db45139b",
+        "plan_hash": "78ccc35ab60f06a5d72822eae6f6ad831b1e24345cdc1a5d01eeb5dcc14d6b13",
+        "task_params_hash": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+        "task_params": {},
+        "model": "medgemma",
+        "prompt_version": "2026-02-23-v3"
+      },
+      "payload": {
+        "patient_id": "P0017",
+        "target_condition": "pancreatic_cancer",
+        "horizon_months": 24,
+        "risk_probability": 0.25,
+        "risk_level": "moderate",
+        "key_risk_factors": [
+          "New-onset diabetes at age 47",
+          "Unintentional weight loss documented",
+          "Persistent pruritus",
+          "Early satiety",
+          "Bloating/dyspepsia",
+          "Mildly abnormal LFTs noted",
+          "History of NAFLD"
+        ],
+        "key_protective_factors": [
+          "No explicit jaundice documented",
+          "No recent imaging available in chart"
+        ],
+        "recommended_next_steps": [
+          "Follow up on pending investigations (Ferritin, LFTs, Abdominal ultrasound)",
+          "Consider specialist referral given persistent symptoms and new-onset diabetes",
+          "Review timing of prior abdominal imaging if available"
+        ],
+        "safety_notes": [
+          "Risk estimate is note-based and not diagnostic. Symptoms are non-specific and could have multiple causes. Conservative estimate due to limited data."
+        ]
+      },
+      "saved_at": 1771927287.9851754,
+      "last_accessed_at": 1771927287.9851754
+    },
+    "982a4ad5a8d8db4e3dfb6968144ef8f33d743879aaef68ba40d77fd4c887d84e": {
+      "meta": {
+        "cache_schema": 1,
+        "task": "risk_assessment",
+        "patient": "P0018",
+        "note_hash": "4e0ec55bef65762901375eefed5b7b37005e54aa3a7b4750e0ccb938a2e99056",
+        "plan_hash": "78ccc35ab60f06a5d72822eae6f6ad831b1e24345cdc1a5d01eeb5dcc14d6b13",
+        "task_params_hash": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+        "task_params": {},
+        "model": "medgemma",
+        "prompt_version": "2026-02-23-v3"
+      },
+      "payload": {
+        "patient_id": "P0018",
+        "target_condition": "pancreatic_cancer",
+        "horizon_months": 24,
+        "risk_probability": 0.25,
+        "risk_level": "moderate",
+        "key_risk_factors": [
+          "Unintentional weight loss documented across visits",
+          "New-onset diabetes documented",
+          "Pruritus documented across visits",
+          "Early satiety documented across visits",
+          "Epigastric discomfort documented across visits",
+          "Intermittent back pain documented across visits",
+          "Dark urine documented",
+          "Nausea documented across visits",
+          "Bloating documented",
+          "Dyspepsia documented",
+          "Mildly abnormal LFTs documented",
+          "Age > 65 years",
+          "Male sex"
+        ],
+        "key_protective_factors": [
+          "Lipase within normal range documented",
+          "No explicit jaundice documented"
+        ],
+        "recommended_next_steps": [
+          "Review timing and results of prior CT abdomen",
+          "Arrange clinician assessment for persistent alarm symptoms",
+          "Consider further investigation for new-onset diabetes and weight loss"
+        ],
+        "safety_notes": [
+          "Risk estimate is note-based and not diagnostic. Multiple symptoms are non-specific but concerning in combination. Imaging status is unclear."
+        ]
+      },
+      "saved_at": 1771927305.5490613,
+      "last_accessed_at": 1771927305.5490613
+    },
+    "9d8d7372bfea455bde51fa036d08e9e8818077550cb9af7404ebd37f464afe17": {
+      "meta": {
+        "cache_schema": 1,
+        "task": "risk_assessment",
+        "patient": "P0019",
+        "note_hash": "e19d9f540a2e07060a5b2045b62a65dd8dc86df557810e839e9be78cdf6686d5",
+        "plan_hash": "78ccc35ab60f06a5d72822eae6f6ad831b1e24345cdc1a5d01eeb5dcc14d6b13",
+        "task_params_hash": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+        "task_params": {},
+        "model": "medgemma",
+        "prompt_version": "2026-02-23-v3"
+      },
+      "payload": {
+        "patient_id": "P0019",
+        "target_condition": "pancreatic_cancer",
+        "horizon_months": 24,
+        "risk_probability": 0.25,
+        "risk_level": "moderate",
+        "key_risk_factors": [
+          "Unintentional weight loss documented",
+          "New-onset diabetes documented",
+          "Decreased appetite documented across multiple visits",
+          "Dark urine documented across multiple visits",
+          "Fatigue documented across multiple visits",
+          "Worsening A1c documented"
+        ],
+        "key_protective_factors": [
+          "Lipase within normal range documented on multiple occasions",
+          "No explicit jaundice documented"
+        ],
+        "recommended_next_steps": [
+          "Review timing and results of prior abdominal imaging",
+          "Arrange clinician assessment for persistent alarm symptoms (weight loss, decreased appetite, dark urine)",
+          "Follow up on pending investigations (Ferritin)"
+        ],
+        "safety_notes": [
+          "Risk estimate is note-based and not diagnostic. Multiple concerning symptoms are present, but lipase has been normal. Further investigation is warranted."
+        ]
+      },
+      "saved_at": 1771927325.695701,
+      "last_accessed_at": 1771927325.695701
+    },
+    "71cd68259c8f0d3043f0b58a3dde147e9535c4f7a12a6c9abedb4e43290f7b3d": {
+      "meta": {
+        "cache_schema": 1,
+        "task": "risk_assessment",
+        "patient": "P0020",
+        "note_hash": "1638a8602bdef40e5a145c74b4e29cb31e7b4d52064a740c51ed821254f00ba3",
+        "plan_hash": "78ccc35ab60f06a5d72822eae6f6ad831b1e24345cdc1a5d01eeb5dcc14d6b13",
+        "task_params_hash": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+        "task_params": {},
+        "model": "medgemma",
+        "prompt_version": "2026-02-23-v3"
+      },
+      "payload": {
+        "patient_id": "P0020",
+        "target_condition": "pancreatic_cancer",
+        "horizon_months": 24,
+        "risk_probability": 0.25,
+        "risk_level": "moderate",
+        "key_risk_factors": [
+          "New-onset diabetes at age 58",
+          "Unintentional weight loss documented across visits",
+          "Persistent epigastric discomfort/dyspepsia",
+          "Dark urine noted",
+          "Mildly abnormal LFTs noted",
+          "Early satiety noted",
+          "Decreased appetite noted",
+          "Intermittent back pain noted",
+          "Worsening A1c noted",
+          "Unresolved workup (abdominal imaging, ferritin)"
+        ],
+        "key_protective_factors": [
+          "Lipase within normal range per note (2020-09-04)"
+        ],
+        "recommended_next_steps": [
+          "Review prior imaging results if available",
+          "Arrange clinician assessment for persistent alarm symptoms and weight loss",
+          "Consider specialist referral for persistent symptoms and abnormal labs",
+          "Follow up on pending investigations (ferritin, CT abdomen)"
+        ],
+        "safety_notes": [
+          "Risk estimate is note-based and not diagnostic. Multiple concerning symptoms are present but lack definitive imaging or specialist evaluation."
+        ]
+      },
+      "saved_at": 1771927343.8397675,
+      "last_accessed_at": 1771927343.8397675
+    },
+    "f2e86c92a659ac018ed1aad7e76c3f860ccd1ae9f0fa1f37aafcf8f0374a13a5": {
+      "meta": {
+        "cache_schema": 1,
+        "task": "risk_assessment",
+        "patient": "P0021",
+        "note_hash": "4c5092b8fa86225b92ebd0dca8eabc013797609f7edd52d1edee15cd3f57cebe",
+        "plan_hash": "78ccc35ab60f06a5d72822eae6f6ad831b1e24345cdc1a5d01eeb5dcc14d6b13",
+        "task_params_hash": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+        "task_params": {},
+        "model": "medgemma",
+        "prompt_version": "2026-02-23-v3"
+      },
+      "payload": {
+        "patient_id": "P0021",
+        "target_condition": "pancreatic_cancer",
+        "horizon_months": 24,
+        "risk_probability": 0.25,
+        "risk_level": "moderate",
+        "key_risk_factors": [
+          "New-onset diabetes documented in 2020",
+          "Unintentional weight loss documented in 2021",
+          "Family history of pancreatic or GI malignancy documented in a first-degree relative",
+          "Epigastric discomfort documented across visits",
+          "Decreased appetite documented in 2020",
+          "Bloating documented across visits",
+          "Pruritus documented in 2019 and 2021",
+          "Dark urine documented in 2020",
+          "Increased A1c noted in 2020 and 2021",
+          "Age 83 years old",
+          "Ferritin pending at multiple visits",
+          "MRI deferred pending specialist advice at multiple visits",
+          "CT abdomen discussed; completion status unclear at multiple visits"
+        ],
+        "key_protective_factors": [
+          "Lipase within normal range per note in 2021",
+          "No explicit jaundice documented"
+        ],
+        "recommended_next_steps": [
+          "Review timing and results of prior abdominal imaging (CT/MRI)",
+          "Arrange clinician assessment for persistent alarm symptoms (weight loss, decreased appetite, epigastric discomfort)",
+          "Evaluate new-onset diabetes in context of other symptoms",
+          "Follow up on pending investigations (Ferritin, CMP)"
+        ],
+        "safety_notes": [
+          "Risk estimate is note-based and not diagnostic",
+          "Multiple pending investigations and deferred imaging contribute to uncertainty"
+        ]
+      },
+      "saved_at": 1771927366.8021364,
+      "last_accessed_at": 1771927366.8021364
+    },
+    "c00c88e660739dcc2b19b08e33bcb11d504194ab9fb82cd97cda4d9745453056": {
+      "meta": {
+        "cache_schema": 1,
+        "task": "risk_assessment",
+        "patient": "P0022",
+        "note_hash": "5e9763e53555a09acba583183c21aef04d7a2325d51db84e7678ac63c5f1b805",
+        "plan_hash": "78ccc35ab60f06a5d72822eae6f6ad831b1e24345cdc1a5d01eeb5dcc14d6b13",
+        "task_params_hash": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+        "task_params": {},
+        "model": "medgemma",
+        "prompt_version": "2026-02-23-v3"
+      },
+      "payload": {
+        "patient_id": "P0022",
+        "target_condition": "pancreatic_cancer",
+        "horizon_months": 24,
+        "risk_probability": 0.25,
+        "risk_level": "moderate",
+        "key_risk_factors": [
+          "Unintentional weight loss documented across visits (2019-10-30, baseline)",
+          "New-onset diabetes noted (2020-02-28, 2020-10-24, 2021-03-02)",
+          "Dark urine reported (2019-10-30, 2021-03-02)",
+          "Epigastric discomfort/dyspepsia reported (2020-06-19)",
+          "Mild cholestatic LFT pattern noted repeatedly (2020-06-19, 2020-10-24, 2021-03-02)",
+          "Intermittent back pain reported (2019-10-30, 2020-10-24)"
+        ],
+        "key_protective_factors": [
+          "No explicit jaundice documented",
+          "CBC reviewed; no critical abnormalities documented (2020-02-28)"
+        ],
+        "recommended_next_steps": [
+          "Review timing and results of prior abdominal imaging (ultrasound, CT)",
+          "Arrange clinician assessment for persistent alarm symptoms (weight loss, dark urine, dyspepsia, back pain)",
+          "Follow up on pending investigations (Ferritin, MRI, CT abdomen)"
+        ],
+        "safety_notes": [
+          "Risk estimate is note-based and not diagnostic. Multiple concerning symptoms are present, but no definitive diagnosis is made in the notes."
+        ]
+      },
+      "saved_at": 1771927398.5860074,
+      "last_accessed_at": 1771927398.5860074
+    },
+    "e20f68d41f160daf592032707abd47f7b189fbe11d9ffdffebfe3383a9f88118": {
+      "meta": {
+        "cache_schema": 1,
+        "task": "risk_assessment",
+        "patient": "P0023",
+        "note_hash": "a664160f7410193015848a27b3e04ea480dfdbde8a599540863bcad06f7dde90",
+        "plan_hash": "78ccc35ab60f06a5d72822eae6f6ad831b1e24345cdc1a5d01eeb5dcc14d6b13",
+        "task_params_hash": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+        "task_params": {},
+        "model": "medgemma",
+        "prompt_version": "2026-02-23-v3"
+      },
+      "payload": {
+        "patient_id": "P0023",
+        "target_condition": "pancreatic_cancer",
+        "horizon_months": 24,
+        "risk_probability": 0.25,
+        "risk_level": "moderate",
+        "key_risk_factors": [
+          "New-onset diabetes documented in 2019",
+          "Unintentional weight loss documented in 2019",
+          "Persistent dyspepsia documented across multiple visits",
+          "Pruritus documented in 2020 and 2021",
+          "Early satiety documented in 2021",
+          "Intermittent back pain documented in 2020 and 2021",
+          "Increased A1c noted in 2021",
+          "Age 78 at time of notes",
+          "Decreased appetite documented in 2020",
+          "Fatigue documented in 2021",
+          "Bloating documented in 2021",
+          "Dark urine documented in 2019"
+        ],
+        "key_protective_factors": [
+          "Lipase within normal range per multiple notes",
+          "No explicit jaundice documented",
+          "No critical CBC abnormalities documented"
+        ],
+        "recommended_next_steps": [
+          "Review status of abdominal imaging (CT, Ultrasound)",
+          "Follow up on pending investigations (Ferritin, CMP)",
+          "Arrange clinician assessment for persistent alarm symptoms (weight loss, dyspepsia, pruritus, early satiety, back pain)"
+        ],
+        "safety_notes": [
+          "Risk estimate is note-based and not diagnostic. Multiple concerning symptoms are present, but lipase is normal and imaging status is unclear."
+        ]
+      },
+      "saved_at": 1771927422.4276555,
+      "last_accessed_at": 1771927422.4276555
+    },
+    "b87680166b3ffcc69a45cac8630379bd61ea324378f12de4637d07edc494e686": {
+      "meta": {
+        "cache_schema": 1,
+        "task": "risk_assessment",
+        "patient": "P0024",
+        "note_hash": "b80967cd19a597f540f6af441851611ab4103c93c46c9a9b0897e4f44dd83394",
+        "plan_hash": "78ccc35ab60f06a5d72822eae6f6ad831b1e24345cdc1a5d01eeb5dcc14d6b13",
+        "task_params_hash": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+        "task_params": {},
+        "model": "medgemma",
+        "prompt_version": "2026-02-23-v3"
+      },
+      "payload": {
+        "patient_id": "P0024",
+        "target_condition": "pancreatic_cancer",
+        "horizon_months": 24,
+        "risk_probability": 0.15,
+        "risk_level": "moderate",
+        "key_risk_factors": [
+          "New-onset diabetes noted in 2019",
+          "Unintentional weight loss documented in 2020",
+          "Persistent dyspepsia, nausea, bloating across visits",
+          "Mildly abnormal LFTs noted in 2020",
+          "Intermittent back pain noted in 2019",
+          "Age 44 at onset of symptoms"
+        ],
+        "key_protective_factors": [
+          "No explicit jaundice documented",
+          "No critical CBC abnormalities documented"
+        ],
+        "recommended_next_steps": [
+          "Review timing and findings of prior abdominal imaging",
+          "Arrange clinician assessment for persistent alarm symptoms",
+          "Follow-up on pending investigations (LFTs, MRI)"
+        ],
+        "safety_notes": [
+          "Risk estimate is note-based and not diagnostic. Evidence is limited to longitudinal symptoms and lab findings."
+        ]
+      },
+      "saved_at": 1771927438.292067,
+      "last_accessed_at": 1771927438.292067
+    },
+    "4f144e61bde90dc92a0c504fd6fa253c2de2aeae6abe60c33a52578b8f48210c": {
+      "meta": {
+        "cache_schema": 1,
+        "task": "risk_assessment",
+        "patient": "P0025",
+        "note_hash": "ca56f0a3fed3367bfa3604262540c355d5c38c69daacfdc8349e44576402da43",
+        "plan_hash": "78ccc35ab60f06a5d72822eae6f6ad831b1e24345cdc1a5d01eeb5dcc14d6b13",
+        "task_params_hash": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+        "task_params": {},
+        "model": "medgemma",
+        "prompt_version": "2026-02-23-v3"
+      },
+      "payload": {
+        "patient_id": "P0025",
+        "target_condition": "pancreatic_cancer",
+        "horizon_months": 24,
+        "risk_probability": 0.25,
+        "risk_level": "moderate",
+        "key_risk_factors": [
+          "Unintentional weight loss documented across multiple visits (2019-11-29, 2020-03-21, 2021-03-23)",
+          "New-onset diabetes documented (2019-11-29, 2020-08-03)",
+          "Decreased appetite documented (2020-08-03, 2020-12-01)",
+          "Early satiety documented (2020-12-01)",
+          "Epigastric discomfort documented (2021-07-12)",
+          "Dark urine documented (2021-03-23)",
+          "Mildly abnormal LFTs documented (2021-07-12)",
+          "Age 60 at first note (2019-11-29)"
+        ],
+        "key_protective_factors": [
+          "Lipase within normal range per note (2020-08-03, 2021-03-23)",
+          "No critical CBC abnormalities documented (2019-11-29, 2020-03-21)"
+        ],
+        "recommended_next_steps": [
+          "Review status of prior imaging (Abdominal ultrasound requested 2019-11-29, CT abdomen discussed 2020-03-21, 2020-12-01)",
+          "Follow up on specialist advice regarding MRI (deferred 2021-03-23, 2021-07-12)",
+          "Review repeat CMP results (planned 2020-12-01)",
+          "Review repeat LFT results (ordered 2021-07-12)",
+          "Arrange clinician assessment for persistent alarm symptoms"
+        ],
+        "safety_notes": [
+          "Risk estimate is note-based and not diagnostic. Multiple concerning symptoms are present but investigations are incomplete or pending. Conservative estimate due to incomplete workup."
+        ]
+      },
+      "saved_at": 1771927479.0191693,
+      "last_accessed_at": 1771927479.0191693
+    },
+    "b987bf4f5dc7bd572f3d2f6f025db4312620f7f9542f4e68ae30f5d1e83888e5": {
+      "meta": {
+        "cache_schema": 1,
+        "task": "queue_prioritization",
+        "patient": "P0001",
+        "note_hash": "de5d24c4aad96e451c7d14491b4316480fb2d3aa7abab55b2019b145f90d726d",
+        "plan_hash": "78ccc35ab60f06a5d72822eae6f6ad831b1e24345cdc1a5d01eeb5dcc14d6b13",
+        "task_params_hash": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+        "task_params": {},
+        "model": "medgemma",
+        "prompt_version": "2026-02-23-v3"
+      },
+      "payload": {
+        "patient_id": "P0001",
+        "priority_score": 0.85,
+        "priority_level": "high",
+        "queue_reason": "Multiple documented alarm symptoms (unintentional weight loss, persistent epigastric discomfort, pruritus, back pain) and worsening diabetes control over 2 years, with unclear status of requested abdominal imaging.",
+        "recommended_window": "within 1 week"
+      },
+      "saved_at": 1771927490.3609767,
+      "last_accessed_at": 1771927490.3609767
+    },
+    "408d5ace67dc93324c5957b9abf2c5163ff58b9e3d08da5e2598ea3e216cb72c": {
+      "meta": {
+        "cache_schema": 1,
+        "task": "queue_prioritization",
+        "patient": "P0002",
+        "note_hash": "c7a74613bc167ded08dfa31b9fff9db6dca5b65c8e81a5950a48a52c107bc982",
+        "plan_hash": "78ccc35ab60f06a5d72822eae6f6ad831b1e24345cdc1a5d01eeb5dcc14d6b13",
+        "task_params_hash": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+        "task_params": {},
+        "model": "medgemma",
+        "prompt_version": "2026-02-23-v3"
+      },
+      "payload": {
+        "patient_id": "P0002",
+        "priority_score": 0.85,
+        "priority_level": "high",
+        "queue_reason": "Multiple persistent alarm symptoms (weight loss, new diabetes, dyspepsia, back pain, dark urine, early satiety) documented over 2 years, plus mildly abnormal LFTs and lack of recent imaging despite discussion. High risk context for pancreatic cancer.",
+        "recommended_window": "within 1 week"
+      },
+      "saved_at": 1771927502.1778991,
+      "last_accessed_at": 1771927502.1778991
+    },
+    "3ab7f992af9dd697824b867cc3eef0f4e5132ebc2982f77093bff11a09eaf09b": {
+      "meta": {
+        "cache_schema": 1,
+        "task": "queue_prioritization",
+        "patient": "P0003",
+        "note_hash": "64b41557cd5e0f90cd271df56f0541748804808a92ab0c10b775ea7a6f873f17",
+        "plan_hash": "78ccc35ab60f06a5d72822eae6f6ad831b1e24345cdc1a5d01eeb5dcc14d6b13",
+        "task_params_hash": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+        "task_params": {},
+        "model": "medgemma",
+        "prompt_version": "2026-02-23-v3"
+      },
+      "payload": {
+        "patient_id": "P0003",
+        "priority_score": 0.85,
+        "priority_level": "high",
+        "queue_reason": "Multiple persistent symptoms (dyspepsia, dark urine, decreased appetite) plus new-onset diabetes at age 69. Unresolved imaging requests (ultrasound, CT abdomen) and pending investigations (Ferritin) require follow-up.",
+        "recommended_window": "within 1 week"
+      },
+      "saved_at": 1771927515.703153,
+      "last_accessed_at": 1771927515.703153
+    },
+    "65907dae20efa20a39104005cf736b924ba854f5a16215789f9f9b998cd962fc": {
+      "meta": {
+        "cache_schema": 1,
+        "task": "queue_prioritization",
+        "patient": "P0004",
+        "note_hash": "1f83148ce9a7eb624686cccd92fcb4c62740acdc4b006a285ba0b7535dda593b",
+        "plan_hash": "78ccc35ab60f06a5d72822eae6f6ad831b1e24345cdc1a5d01eeb5dcc14d6b13",
+        "task_params_hash": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+        "task_params": {},
+        "model": "medgemma",
+        "prompt_version": "2026-02-23-v3"
+      },
+      "payload": {
+        "patient_id": "P0004",
+        "priority_score": 0.85,
+        "priority_level": "high",
+        "queue_reason": "Multiple concerning symptoms (unintentional weight loss, epigastric discomfort, back pain, pruritus, dark urine) persist across multiple visits, alongside new-onset diabetes and worsening glycemia. Status of prior CT abdomen unclear. Requires clinician assessment.",
+        "recommended_window": "within 1 week"
+      },
+      "saved_at": 1771927529.3918214,
+      "last_accessed_at": 1771927529.3918214
+    },
+    "78581014d321113725b0ff63011a30222e2257dbace5f1bd7ffe88fff93d815b": {
+      "meta": {
+        "cache_schema": 1,
+        "task": "queue_prioritization",
+        "patient": "P0005",
+        "note_hash": "bf2b108fa790117be01afefa2a2f7700c01b78c3cb0fcd92463bca0d5761b2ef",
+        "plan_hash": "78ccc35ab60f06a5d72822eae6f6ad831b1e24345cdc1a5d01eeb5dcc14d6b13",
+        "task_params_hash": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+        "task_params": {},
+        "model": "medgemma",
+        "prompt_version": "2026-02-23-v3"
+      },
+      "payload": {
+        "patient_id": "P0005",
+        "priority_score": 0.85,
+        "priority_level": "high",
+        "queue_reason": "Multiple persistent alarm symptoms (unintentional weight loss, new-onset diabetes, dyspepsia, pruritus) and unresolved imaging (CT abdomen) warrant urgent review for potential pancreatic cancer risk.",
+        "recommended_window": "within 1 week"
+      },
+      "saved_at": 1771927541.9851136,
+      "last_accessed_at": 1771927541.9851136
+    },
+    "80ac205da840bb85f63862d5a440e7a23bb4656b4244a388454e4b5e2e00bdd7": {
+      "meta": {
+        "cache_schema": 1,
+        "task": "queue_prioritization",
+        "patient": "P0006",
+        "note_hash": "cb33a3dfadc271f88c6778baf5b1b5deb45138ff9187ff10d409914dde9b5c81",
+        "plan_hash": "78ccc35ab60f06a5d72822eae6f6ad831b1e24345cdc1a5d01eeb5dcc14d6b13",
+        "task_params_hash": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+        "task_params": {},
+        "model": "medgemma",
+        "prompt_version": "2026-02-23-v3"
+      },
+      "payload": {
+        "patient_id": "P0006",
+        "priority_score": 0.85,
+        "priority_level": "high",
+        "queue_reason": "Multiple documented alarm symptoms (unintentional weight loss, nausea, early satiety) persist across multiple visits (2019-04-13 to 2021-01-08). Mildly abnormal LFTs noted on multiple occasions. No recent imaging available in chart.",
+        "recommended_window": "within 1 week"
+      },
+      "saved_at": 1771927556.1448984,
+      "last_accessed_at": 1771927556.1448984
+    },
+    "5ba4e0e1fa29a4d8c30a53adb76775e0df5e8bf57891ad09a6136db292555244": {
+      "meta": {
+        "cache_schema": 1,
+        "task": "queue_prioritization",
+        "patient": "P0007",
+        "note_hash": "78896c3b7fcc3216ff0c0241ff3659d472976f2dacd2a6826d8b9d0ea32a64fc",
+        "plan_hash": "78ccc35ab60f06a5d72822eae6f6ad831b1e24345cdc1a5d01eeb5dcc14d6b13",
+        "task_params_hash": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+        "task_params": {},
+        "model": "medgemma",
+        "prompt_version": "2026-02-23-v3"
+      },
+      "payload": {
+        "patient_id": "P0007",
+        "priority_score": 0.85,
+        "priority_level": "high",
+        "queue_reason": "Multiple persistent alarm symptoms (weight loss, back pain, nausea, dyspepsia, dark urine, bloating) plus new-onset diabetes and family history of pancreatic/GI malignancy. Pending investigations (CMP, Abdominal ultrasound) require follow-up.",
+        "recommended_window": "within 1 week"
+      },
+      "saved_at": 1771927567.2750106,
+      "last_accessed_at": 1771927567.2750106
+    },
+    "2fb1f9657389f7cb487357e056a55e392eea823961238137cae763861b1df3b2": {
+      "meta": {
+        "cache_schema": 1,
+        "task": "queue_prioritization",
+        "patient": "P0008",
+        "note_hash": "63655b7210233716296c9dc3afe3068c3bd6d464b29bbd55153678616d6c709c",
+        "plan_hash": "78ccc35ab60f06a5d72822eae6f6ad831b1e24345cdc1a5d01eeb5dcc14d6b13",
+        "task_params_hash": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+        "task_params": {},
+        "model": "medgemma",
+        "prompt_version": "2026-02-23-v3"
+      },
+      "payload": {
+        "patient_id": "P0008",
+        "priority_score": 0.85,
+        "priority_level": "high",
+        "queue_reason": "Multiple persistent alarm symptoms (epigastric discomfort, decreased appetite, pruritus, dark urine, unintentional weight loss, early satiety, nausea) and new-onset diabetes in a 48-year-old male. Unclear status of recommended CT abdomen.",
+        "recommended_window": "within 1 week"
+      },
+      "saved_at": 1771927578.3854985,
+      "last_accessed_at": 1771927578.3854985
+    },
+    "dab6bfb150644d30cc5506e72d11fc8615d772a54c53b0713f79355d9af4a5b9": {
+      "meta": {
+        "cache_schema": 1,
+        "task": "queue_prioritization",
+        "patient": "P0009",
+        "note_hash": "6f18a18aee6e55a82ee0f5c85810c42d1f1bb9252bcbedf609612f629f8f129e",
+        "plan_hash": "78ccc35ab60f06a5d72822eae6f6ad831b1e24345cdc1a5d01eeb5dcc14d6b13",
+        "task_params_hash": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+        "task_params": {},
+        "model": "medgemma",
+        "prompt_version": "2026-02-23-v3"
+      },
+      "payload": {
+        "patient_id": "P0009",
+        "priority_score": 0.85,
+        "priority_level": "high",
+        "queue_reason": "Multiple persistent alarm symptoms (unintentional weight loss, decreased appetite, early satiety, dyspepsia) documented across multiple visits, plus dark urine and pruritus. Unclear status of prior CT abdomen and pending abdominal ultrasound results require follow-up.",
+        "recommended_window": "within 1 week"
+      },
+      "saved_at": 1771927589.613177,
+      "last_accessed_at": 1771927589.613177
+    },
+    "67a1af0272c19bdbea5dfd2ffd53f84ed7bc26aaa87e087a802686d97aef282e": {
+      "meta": {
+        "cache_schema": 1,
+        "task": "queue_prioritization",
+        "patient": "P0010",
+        "note_hash": "443dc326465a57a09b28e7e7867aa7fe6b42ddbff1c6da0903ebd2a35b2e8f2f",
+        "plan_hash": "78ccc35ab60f06a5d72822eae6f6ad831b1e24345cdc1a5d01eeb5dcc14d6b13",
+        "task_params_hash": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+        "task_params": {},
+        "model": "medgemma",
+        "prompt_version": "2026-02-23-v3"
+      },
+      "payload": {
+        "patient_id": "P0010",
+        "priority_score": 0.85,
+        "priority_level": "high",
+        "queue_reason": "Multiple persistent alarm symptoms (pruritus, early satiety, dyspepsia, weight loss indicators) plus new-onset diabetes and unclear imaging status warrant urgent review for potential pancreatic cancer risk.",
+        "recommended_window": "within 1 week"
+      },
+      "saved_at": 1771927600.1255562,
+      "last_accessed_at": 1771927600.1255562
+    },
+    "e14d5fdd5623f54affaef90fac6be048a6dd0baac89d03902c284acc126ad58e": {
+      "meta": {
+        "cache_schema": 1,
+        "task": "queue_prioritization",
+        "patient": "P0011",
+        "note_hash": "ddefc4d5a0123f6a2485f4bb5831ab209e7c2520b923765c96d96088fe4d856a",
+        "plan_hash": "78ccc35ab60f06a5d72822eae6f6ad831b1e24345cdc1a5d01eeb5dcc14d6b13",
+        "task_params_hash": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+        "task_params": {},
+        "model": "medgemma",
+        "prompt_version": "2026-02-23-v3"
+      },
+      "payload": {
+        "patient_id": "P0011",
+        "priority_score": 0.85,
+        "priority_level": "high",
+        "queue_reason": "Multiple persistent alarm symptoms (early satiety, decreased appetite, back pain, dark urine) and cholestatic LFT pattern over 2 years, despite prior deferrals of imaging. Risk context suggests elevated pancreatic cancer risk.",
+        "recommended_window": "within 1 week"
+      },
+      "saved_at": 1771927611.7155163,
+      "last_accessed_at": 1771927611.7155163
+    },
+    "0f04d379fbb77a14bd77c8cf0e266774b620fe52f3a180fb7defeea565831ad7": {
+      "meta": {
+        "cache_schema": 1,
+        "task": "queue_prioritization",
+        "patient": "P0012",
+        "note_hash": "8b3854e6d342c08b91aab385f2bf2d9dddc27441c06cd40bf1e7f4aefb0bc483",
+        "plan_hash": "78ccc35ab60f06a5d72822eae6f6ad831b1e24345cdc1a5d01eeb5dcc14d6b13",
+        "task_params_hash": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+        "task_params": {},
+        "model": "medgemma",
+        "prompt_version": "2026-02-23-v3"
+      },
+      "payload": {
+        "patient_id": "P0012",
+        "priority_score": 0.85,
+        "priority_level": "high",
+        "queue_reason": "Multiple persistent alarm symptoms (weight loss, dyspepsia, decreased appetite, back pain) documented across multiple visits, plus new-onset diabetes and pending investigations (Ferritin, MRI) with unclear imaging status (CT abdomen).",
+        "recommended_window": "within 1 week"
+      },
+      "saved_at": 1771927624.1644728,
+      "last_accessed_at": 1771927624.1644728
+    },
+    "e285cb5d82ed2cf3bae1bbfa17747163ddcdc06965e465ef7f1a3e67df08623d": {
+      "meta": {
+        "cache_schema": 1,
+        "task": "queue_prioritization",
+        "patient": "P0013",
+        "note_hash": "105bc7f6261e281c73601d43c09f16a99161fe33feaaf2735cba7958fca1cc0c",
+        "plan_hash": "78ccc35ab60f06a5d72822eae6f6ad831b1e24345cdc1a5d01eeb5dcc14d6b13",
+        "task_params_hash": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+        "task_params": {},
+        "model": "medgemma",
+        "prompt_version": "2026-02-23-v3"
+      },
+      "payload": {
+        "patient_id": "P0013",
+        "priority_score": 0.85,
+        "priority_level": "high",
+        "queue_reason": "Multiple concerning symptoms (weight loss, back pain, dark urine, pruritus) and new-onset diabetes in an elderly patient, with pending/unclear imaging status. Risk assessment indicates moderate risk for pancreatic cancer within 24 months.",
+        "recommended_window": "within 1 week"
+      },
+      "saved_at": 1771927634.612371,
+      "last_accessed_at": 1771927634.612371
+    },
+    "00ee32874c81961b0c6a7602b5dd797edd6c59a4af3511e5ca2710ffb3fc4fc8": {
+      "meta": {
+        "cache_schema": 1,
+        "task": "queue_prioritization",
+        "patient": "P0014",
+        "note_hash": "9fa36f7c93d36a7139a435827de9f3494d2d172bdf4aef5c2f90955dc0175556",
+        "plan_hash": "78ccc35ab60f06a5d72822eae6f6ad831b1e24345cdc1a5d01eeb5dcc14d6b13",
+        "task_params_hash": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+        "task_params": {},
+        "model": "medgemma",
+        "prompt_version": "2026-02-23-v3"
+      },
+      "payload": {
+        "patient_id": "P0014",
+        "priority_score": 0.85,
+        "priority_level": "high",
+        "queue_reason": "Multiple persistent symptoms (weight loss, appetite change, abdominal discomfort, dark urine) plus family history of pancreatic/GI malignancy warrant urgent review. Status of prior CT abdomen unclear.",
+        "recommended_window": "within 1 week"
+      },
+      "saved_at": 1771927644.2235525,
+      "last_accessed_at": 1771927644.2235525
+    },
+    "cec0671129f60e9963039489e30d6168b219169934a66cbdc7559b06c5e65d7d": {
+      "meta": {
+        "cache_schema": 1,
+        "task": "queue_prioritization",
+        "patient": "P0015",
+        "note_hash": "6f8b96563145f60b846c62d95cb25df2c1e9c81e6675578b2d87718282d5ee49",
+        "plan_hash": "78ccc35ab60f06a5d72822eae6f6ad831b1e24345cdc1a5d01eeb5dcc14d6b13",
+        "task_params_hash": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+        "task_params": {},
+        "model": "medgemma",
+        "prompt_version": "2026-02-23-v3"
+      },
+      "payload": {
+        "patient_id": "P0015",
+        "priority_score": 0.85,
+        "priority_level": "high",
+        "queue_reason": "Multiple persistent alarm symptoms (weight loss, back pain, early satiety, epigastric discomfort) documented over 2 years, coupled with deferred imaging and mildly abnormal LFTs. Requires timely review to assess risk and coordinate further investigation.",
+        "recommended_window": "within 1 week"
+      },
+      "saved_at": 1771927654.6393876,
+      "last_accessed_at": 1771927654.6393876
+    },
+    "79f093466f499e06c579ea1f27647f01463fe2d37bbbeed74a4c6240d51ac9da": {
+      "meta": {
+        "cache_schema": 1,
+        "task": "queue_prioritization",
+        "patient": "P0016",
+        "note_hash": "cfe0a24145b3471229cb98ecae60b6ba2e6c872a6bc96c96b29799aa70a161c9",
+        "plan_hash": "78ccc35ab60f06a5d72822eae6f6ad831b1e24345cdc1a5d01eeb5dcc14d6b13",
+        "task_params_hash": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+        "task_params": {},
+        "model": "medgemma",
+        "prompt_version": "2026-02-23-v3"
+      },
+      "payload": {
+        "patient_id": "P0016",
+        "priority_score": 0.85,
+        "priority_level": "high",
+        "queue_reason": "Multiple persistent symptoms (dyspepsia, pruritus, back pain) plus new-onset diabetes and recent dark urine/bloating raise concern. Unclear status of prior CT abdomen and lack of recent imaging.",
+        "recommended_window": "within 1 week"
+      },
+      "saved_at": 1771927665.1459377,
+      "last_accessed_at": 1771927665.1459377
+    },
+    "d884895738849291b15235253590864a5e4d9c9d265fca7d0fae9103e7052c3c": {
+      "meta": {
+        "cache_schema": 1,
+        "task": "queue_prioritization",
+        "patient": "P0017",
+        "note_hash": "483ca03d71d8ee70f19891c0bf4f2a376f298e8217018d363d4a1e97db45139b",
+        "plan_hash": "78ccc35ab60f06a5d72822eae6f6ad831b1e24345cdc1a5d01eeb5dcc14d6b13",
+        "task_params_hash": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+        "task_params": {},
+        "model": "medgemma",
+        "prompt_version": "2026-02-23-v3"
+      },
+      "payload": {
+        "patient_id": "P0017",
+        "priority_score": 0.85,
+        "priority_level": "high",
+        "queue_reason": "Multiple persistent symptoms (pruritus, early satiety, bloating, dyspepsia) plus new-onset diabetes and unintentional weight loss raise concern for pancreatic cancer risk. Pending investigations (Ferritin, LFTs, Abdominal ultrasound) require follow-up.",
+        "recommended_window": "within 1 week"
+      },
+      "saved_at": 1771927676.6169255,
+      "last_accessed_at": 1771927676.6169255
+    },
+    "f0dc235fc8c729b83a3c4f621b38bf2cf21591a4bbf1a21fd196c3b3bc140cd8": {
+      "meta": {
+        "cache_schema": 1,
+        "task": "queue_prioritization",
+        "patient": "P0018",
+        "note_hash": "4e0ec55bef65762901375eefed5b7b37005e54aa3a7b4750e0ccb938a2e99056",
+        "plan_hash": "78ccc35ab60f06a5d72822eae6f6ad831b1e24345cdc1a5d01eeb5dcc14d6b13",
+        "task_params_hash": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+        "task_params": {},
+        "model": "medgemma",
+        "prompt_version": "2026-02-23-v3"
+      },
+      "payload": {
+        "patient_id": "P0018",
+        "priority_score": 0.85,
+        "priority_level": "high",
+        "queue_reason": "Multiple persistent alarm symptoms (weight loss, early satiety, epigastric discomfort, pruritus, back pain) and new-onset diabetes in a 70-year-old male. Unclear status of prior CT abdomen.",
+        "recommended_window": "within 1 week"
+      },
+      "saved_at": 1771927687.446723,
+      "last_accessed_at": 1771927687.446723
+    },
+    "1d967d48f8d1e2b04303be739b18b274fd1aa00d3e4d5d455996c782685fb5e6": {
+      "meta": {
+        "cache_schema": 1,
+        "task": "queue_prioritization",
+        "patient": "P0019",
+        "note_hash": "e19d9f540a2e07060a5b2045b62a65dd8dc86df557810e839e9be78cdf6686d5",
+        "plan_hash": "78ccc35ab60f06a5d72822eae6f6ad831b1e24345cdc1a5d01eeb5dcc14d6b13",
+        "task_params_hash": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+        "task_params": {},
+        "model": "medgemma",
+        "prompt_version": "2026-02-23-v3"
+      },
+      "payload": {
+        "patient_id": "P0019",
+        "priority_score": 0.85,
+        "priority_level": "high",
+        "queue_reason": "Multiple persistent alarm symptoms (weight loss, decreased appetite, dark urine) and worsening A1c over 2 years, despite normal lipase. Pending investigations (Ferritin, imaging) require follow-up.",
+        "recommended_window": "within 1 week"
+      },
+      "saved_at": 1771927697.554442,
+      "last_accessed_at": 1771927697.554442
+    },
+    "10ad5875f133812ef5b9a8b35741894a9716394ee4703f0ea75df23ffe270517": {
+      "meta": {
+        "cache_schema": 1,
+        "task": "queue_prioritization",
+        "patient": "P0020",
+        "note_hash": "1638a8602bdef40e5a145c74b4e29cb31e7b4d52064a740c51ed821254f00ba3",
+        "plan_hash": "78ccc35ab60f06a5d72822eae6f6ad831b1e24345cdc1a5d01eeb5dcc14d6b13",
+        "task_params_hash": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+        "task_params": {},
+        "model": "medgemma",
+        "prompt_version": "2026-02-23-v3"
+      },
+      "payload": {
+        "patient_id": "P0020",
+        "priority_score": 0.85,
+        "priority_level": "high",
+        "queue_reason": "Multiple concerning symptoms (weight loss, dyspepsia, back pain, dark urine, early satiety, decreased appetite) persist over 2 years with unresolved investigations (ferritin, CT abdomen) and worsening A1c. New-onset diabetes at age 58 is also noted.",
+        "recommended_window": "within 1 week"
+      },
+      "saved_at": 1771927708.8399518,
+      "last_accessed_at": 1771927708.8399518
+    },
+    "10f089352de785b8f4c1cd30f736f65fc09f0ee88794cbe81a485e05aead408a": {
+      "meta": {
+        "cache_schema": 1,
+        "task": "queue_prioritization",
+        "patient": "P0021",
+        "note_hash": "4c5092b8fa86225b92ebd0dca8eabc013797609f7edd52d1edee15cd3f57cebe",
+        "plan_hash": "78ccc35ab60f06a5d72822eae6f6ad831b1e24345cdc1a5d01eeb5dcc14d6b13",
+        "task_params_hash": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+        "task_params": {},
+        "model": "medgemma",
+        "prompt_version": "2026-02-23-v3"
+      },
+      "payload": {
+        "patient_id": "P0021",
+        "priority_score": 0.85,
+        "priority_level": "high",
+        "queue_reason": "Multiple persistent alarm symptoms (weight loss, decreased appetite, epigastric discomfort, bloating) plus new-onset diabetes and family history of pancreatic/GI malignancy. Multiple pending investigations (Ferritin, CMP) and deferred/unclear imaging (MRI, CT abdomen) require urgent clarification.",
+        "recommended_window": "within 1 week"
+      },
+      "saved_at": 1771927720.1635125,
+      "last_accessed_at": 1771927720.1635125
+    },
+    "5b2badd3e1c650f8c9d10fffc1a1f8afc96d12b6feacf967c19427bc69ac9e5b": {
+      "meta": {
+        "cache_schema": 1,
+        "task": "queue_prioritization",
+        "patient": "P0022",
+        "note_hash": "5e9763e53555a09acba583183c21aef04d7a2325d51db84e7678ac63c5f1b805",
+        "plan_hash": "78ccc35ab60f06a5d72822eae6f6ad831b1e24345cdc1a5d01eeb5dcc14d6b13",
+        "task_params_hash": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+        "task_params": {},
+        "model": "medgemma",
+        "prompt_version": "2026-02-23-v3"
+      },
+      "payload": {
+        "patient_id": "P0022",
+        "priority_score": 0.85,
+        "priority_level": "high",
+        "queue_reason": "Multiple concerning symptoms (unintentional weight loss, dark urine, dyspepsia, back pain) persist across visits, alongside new-onset diabetes and cholestatic LFT pattern. Pending investigations (Ferritin, MRI, CT abdomen) require follow-up.",
+        "recommended_window": "within 1 week"
+      },
+      "saved_at": 1771927730.9769187,
+      "last_accessed_at": 1771927730.9769187
+    },
+    "50d0dd602922b5086f1dc373212ea4c5cda08131f2ede2ce6b6579f82486072b": {
+      "meta": {
+        "cache_schema": 1,
+        "task": "queue_prioritization",
+        "patient": "P0023",
+        "note_hash": "a664160f7410193015848a27b3e04ea480dfdbde8a599540863bcad06f7dde90",
+        "plan_hash": "78ccc35ab60f06a5d72822eae6f6ad831b1e24345cdc1a5d01eeb5dcc14d6b13",
+        "task_params_hash": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+        "task_params": {},
+        "model": "medgemma",
+        "prompt_version": "2026-02-23-v3"
+      },
+      "payload": {
+        "patient_id": "P0023",
+        "priority_score": 0.85,
+        "priority_level": "high",
+        "queue_reason": "Multiple persistent alarm symptoms (dyspepsia, weight loss, pruritus, early satiety, back pain) and new-onset diabetes in an older adult. Status of recommended imaging (CT, Ultrasound) and pending investigations (Ferritin, CMP) is unclear.",
+        "recommended_window": "within 1 week"
+      },
+      "saved_at": 1771927742.0613313,
+      "last_accessed_at": 1771927742.0613313
+    },
+    "2eace245fd0396f707d4995507aaa16743659710ca133ee157e0f512afcada30": {
+      "meta": {
+        "cache_schema": 1,
+        "task": "queue_prioritization",
+        "patient": "P0024",
+        "note_hash": "b80967cd19a597f540f6af441851611ab4103c93c46c9a9b0897e4f44dd83394",
+        "plan_hash": "78ccc35ab60f06a5d72822eae6f6ad831b1e24345cdc1a5d01eeb5dcc14d6b13",
+        "task_params_hash": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+        "task_params": {},
+        "model": "medgemma",
+        "prompt_version": "2026-02-23-v3"
+      },
+      "payload": {
+        "patient_id": "P0024",
+        "priority_score": 0.85,
+        "priority_level": "high",
+        "queue_reason": "Persistent dyspepsia, nausea, bloating, and unintentional weight loss since 2019, coupled with new-onset diabetes and mildly abnormal LFTs, raise concern for underlying pathology. Pending investigations (LFTs, MRI) require follow-up.",
+        "recommended_window": "within 1 week"
+      },
+      "saved_at": 1771927752.9259148,
+      "last_accessed_at": 1771927752.9259148
+    },
+    "f130dd8527aeddc1843110da10864fd81c786cc8088cf8dda269204cfd2a39e6": {
+      "meta": {
+        "cache_schema": 1,
+        "task": "queue_prioritization",
+        "patient": "P0025",
+        "note_hash": "ca56f0a3fed3367bfa3604262540c355d5c38c69daacfdc8349e44576402da43",
+        "plan_hash": "78ccc35ab60f06a5d72822eae6f6ad831b1e24345cdc1a5d01eeb5dcc14d6b13",
+        "task_params_hash": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+        "task_params": {},
+        "model": "medgemma",
+        "prompt_version": "2026-02-23-v3"
+      },
+      "payload": {
+        "patient_id": "P0025",
+        "priority_score": 0.85,
+        "priority_level": "high",
+        "queue_reason": "Multiple concerning symptoms (weight loss, decreased appetite, early satiety, dark urine, epigastric discomfort) persist across multiple visits despite some investigations. Status of prior imaging (US, CT) and specialist advice (MRI) is unclear. Requires urgent review to ensure appropriate follow-up.",
+        "recommended_window": "within 1 week"
+      },
+      "saved_at": 1771927764.2583814,
+      "last_accessed_at": 1771927764.2583814
+    },
+    "7fadd61f2f9b1e0cd869b075fc0b899613096ab477d951321d956db53607563b": {
+      "meta": {
+        "cache_schema": 1,
+        "task": "clinician_summary",
+        "patient": "P0001",
+        "note_hash": "de5d24c4aad96e451c7d14491b4316480fb2d3aa7abab55b2019b145f90d726d",
+        "plan_hash": "78ccc35ab60f06a5d72822eae6f6ad831b1e24345cdc1a5d01eeb5dcc14d6b13",
+        "task_params_hash": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+        "task_params": {},
+        "model": "medgemma",
+        "prompt_version": "2026-02-23-v3"
+      },
+      "payload": {
+        "patient_id": "P0001",
+        "target_condition": "pancreatic_cancer",
+        "horizon_months": 24,
+        "summary_for_chart": "Mr. Smith has multiple concerning symptoms over the past 2 years, including unintentional weight loss, persistent epigastric discomfort, nausea, bloating, early satiety, pruritus, and intermittent back pain. His A1c has increased on multiple occasions, suggesting worsening diabetes control. Mildly abnormal LFTs were noted in 2019. Multiple abdominal imaging studies (ultrasound, CT) have been requested but their completion status is unclear from the chart. Given the persistence and constellation of symptoms, particularly the unintentional weight loss and new/worsening diabetes, further investigation is warranted to rule out an underlying malignancy like pancreatic cancer. Follow-up is crucial to clarify imaging status and assess for progression.",
+        "suggested_orders": [
+          "Review and clarify status of previously requested abdominal imaging (ultrasound, CT)",
+          "Repeat CBC and LFTs",
+          "Consider CA 19-9 if imaging is unrevealing or concerning"
+        ],
+        "suggested_referrals": [
+          "Referral to Gastroenterology for further evaluation and potential endoscopy",
+          "Consider referral to Oncology if imaging or further workup is highly suspicious"
+        ],
+        "safety_netting": [
+          "Instruct patient on red-flag symptoms including worsening jaundice, severe abdominal pain, or significant changes in bowel habits.",
+          "Ensure clear documentation of imaging completion and results.",
+          "Schedule follow-up appointment to review investigation results and clinical status."
+        ]
+      },
+      "saved_at": 1771927792.145238,
+      "last_accessed_at": 1771927792.145238
+    },
+    "a20391528c0cc988d56c5958f237263bd1a3e27138ae9a495a67557fdde74dc2": {
+      "meta": {
+        "cache_schema": 1,
+        "task": "admin_referral",
+        "patient": "P0001",
+        "note_hash": "de5d24c4aad96e451c7d14491b4316480fb2d3aa7abab55b2019b145f90d726d",
+        "plan_hash": "78ccc35ab60f06a5d72822eae6f6ad831b1e24345cdc1a5d01eeb5dcc14d6b13",
+        "task_params_hash": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+        "task_params": {},
+        "model": "medgemma",
+        "prompt_version": "2026-02-23-v3"
+      },
+      "payload": {
+        "patient_id": "P0001",
+        "target_condition": "pancreatic_cancer",
+        "urgency": "semi-urgent",
+        "destination_service": "Gastroenterology/Oncology",
+        "reason_for_referral": "Referral requested due to persistent concerning symptoms including unintentional weight loss, worsening diabetes (A1c increase), epigastric discomfort, nausea, bloating, early satiety, pruritus, and intermittent back pain documented over multiple visits. Mildly abnormal LFTs were noted in 2019. The constellation of symptoms, particularly the weight loss and new/worsening diabetes, raises concern for an underlying malignancy. Further investigation is warranted.",
+        "attach_documents": [
+          "Recent clinic notes (2019-02-08 to 2021-05-26)",
+          "Relevant labs (CBC, LFTs, A1c)",
+          "List of requested imaging (ultrasound, CT) with dates"
+        ],
+        "admin_notes": [
+          "Clarify status of requested abdominal imaging (ultrasound, CT) completion and results.",
+          "Confirm patient contact information.",
+          "Ensure referral is directed appropriately based on initial assessment (Gastroenterology vs. Oncology)."
+        ]
+      },
+      "saved_at": 1771927816.540312,
+      "last_accessed_at": 1771927816.540312
+    },
+    "86ccccac0c09835bceeaebf9edc009e880437e514163d07bb347f15257278d7d": {
+      "meta": {
+        "cache_schema": 1,
+        "task": "referral_letter",
+        "patient": "P0001",
+        "note_hash": "de5d24c4aad96e451c7d14491b4316480fb2d3aa7abab55b2019b145f90d726d",
+        "plan_hash": "78ccc35ab60f06a5d72822eae6f6ad831b1e24345cdc1a5d01eeb5dcc14d6b13",
+        "task_params_hash": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+        "task_params": {},
+        "model": "medgemma",
+        "prompt_version": "2026-02-23-v3"
+      },
+      "payload": {
+        "patient_id": "P0001",
+        "target_condition": "pancreatic_cancer",
+        "urgency": "semi-urgent",
+        "recipient": "Gastroenterology/Oncology",
+        "letter_body": "Clinic Name\nDATE: 2023-10-27\n\nTO: Gastroenterology/Oncology\nFAX: [Insert Fax Number]\n\nRE: Referral for Taylor Smith, DOB: 1982-02-01, OHIP: 3286-854-204\n\nPatient Information:\nName: Taylor Smith\nDOB: 1982-02-01\nOHIP No: 3286-854-204\nAddress: 702 Leslie St, Richmond Hill, ON\nPhone: 905-758-2424\n\nDear Colleague,\n\nReason for Referral:\nI am referring Mr. Taylor Smith for evaluation of persistent concerning symptoms, including unintentional weight loss, worsening diabetes control, and abdominal discomfort, raising concern for an underlying malignancy, potentially pancreatic cancer.\n\nBackground:\nMr. Smith is a 44-year-old male with a history of hypertension and type 2 diabetes. He has presented multiple times over the past two years with a constellation of symptoms.\n\nKey Clinical Findings:\nSymptoms include unintentional weight loss (documented 2020-05-19, 2021-01-14, 2021-05-26), persistent epigastric discomfort, nausea, bloating, early satiety, pruritus (documented 2019-09-08, 2020-08-25), and intermittent back pain (documented 2019-02-08, 2020-01-05, 2021-05-26). His A1c has increased on multiple occasions, suggesting worsening diabetes control. Mildly abnormal LFTs were noted in 2019.\n\nInvestigations Completed:\nCBC and LFTs reviewed on multiple occasions; no critical abnormalities documented in recent reviews (2020-01-05, 2021-05-26). Abdominal ultrasound and CT abdomen have been requested on multiple occasions (2019-05-15, 2020-01-05, 2020-08-25, 2021-05-26), but the completion status and results are unclear from the chart.\n\nRelevant History & Medications:\nPMH: Hypertension, Type 2 Diabetes.\nMedications: Not available in chart.\n\nRequest:\nGiven the persistence and constellation of symptoms, particularly the unintentional weight loss and new/worsening diabetes, further investigation is warranted. I would appreciate your expert evaluation and management.\n\nSincerely,\n[Your Name/Clinic Name]",
+        "attachments": [
+          "Recent clinic notes (2019-02-08 to 2021-05-26)",
+          "Relevant labs (CBC, LFTs, A1c)",
+          "List of requested imaging (ultrasound, CT) with dates"
+        ]
+      },
+      "saved_at": 1771927872.721727,
+      "last_accessed_at": 1771927872.721727
+    },
+    "112e5c924c21c49529f7928ed0f1dbba729ea74a62780e839dacab66224885b9": {
+      "meta": {
+        "cache_schema": 1,
+        "task": "patient_instructions",
+        "patient": "P0001",
+        "note_hash": "de5d24c4aad96e451c7d14491b4316480fb2d3aa7abab55b2019b145f90d726d",
+        "plan_hash": "78ccc35ab60f06a5d72822eae6f6ad831b1e24345cdc1a5d01eeb5dcc14d6b13",
+        "task_params_hash": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+        "task_params": {},
+        "model": "medgemma",
+        "prompt_version": "2026-02-23-v3"
+      },
+      "payload": {
+        "patient_id": "P0001",
+        "target_condition": "pancreatic_cancer",
+        "horizon_months": 24,
+        "instructions": [
+          "Follow up with your doctor to discuss your symptoms and review any test results.",
+          "If you have been referred to a specialist, attend your appointment.",
+          "If you have been asked to complete imaging tests (like ultrasound or CT scan), please do so as soon as possible.",
+          "Contact your doctor if you develop new or worsening symptoms, such as yellowing of the skin or eyes (jaundice), severe abdominal pain, or significant changes in bowel habits.",
+          "Continue managing your diabetes and hypertension as directed by your doctor.",
+          "Keep track of your symptoms, including weight changes, pain, and any digestive issues.",
+          "Attend your scheduled follow-up appointments to monitor your health."
+        ]
+      },
+      "saved_at": 1771927891.0688415,
+      "last_accessed_at": 1771927891.0688415
+    },
+    "967464b8a5ecf90472b01f9745729c3e16e4ca470e98d860dd0e0e2b5379c90a": {
+      "meta": {
+        "cache_schema": 1,
+        "task": "clinician_summary",
+        "patient": "P0002",
+        "note_hash": "c7a74613bc167ded08dfa31b9fff9db6dca5b65c8e81a5950a48a52c107bc982",
+        "plan_hash": "78ccc35ab60f06a5d72822eae6f6ad831b1e24345cdc1a5d01eeb5dcc14d6b13",
+        "task_params_hash": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+        "task_params": {},
+        "model": "medgemma",
+        "prompt_version": "2026-02-23-v3"
+      },
+      "payload": {
+        "patient_id": "P0002",
+        "target_condition": "pancreatic_cancer",
+        "horizon_months": 24,
+        "summary_for_chart": "This 65-year-old female patient presents with a constellation of concerning symptoms including persistent dyspepsia, intermittent back pain, unintentional weight loss, new-onset diabetes, early satiety, dark urine, bloating, and decreased appetite documented across multiple visits since 2019. Mildly abnormal LFTs have been noted repeatedly, while lipase has been normal on recent checks. Notably, there is no recent imaging available in the chart, and prior imaging (CT abdomen, MRI) discussed in 2019-2020 was either not completed or status is unclear. Given the persistence of multiple alarm symptoms and lack of recent imaging, further investigation is warranted to evaluate for underlying pancreatic pathology.",
+        "suggested_orders": [
+          "Review results of prior imaging (CT/MRI) if available",
+          "Order abdominal imaging (CT or MRI) if not recently performed",
+          "Repeat CMP including LFTs"
+        ],
+        "suggested_referrals": [
+          "Referral to Gastroenterology or Oncology for further evaluation"
+        ],
+        "safety_netting": [
+          "Monitor for worsening symptoms, including jaundice, severe abdominal pain, or significant weight loss.",
+          "Instruct patient on red-flag symptoms requiring urgent attention.",
+          "Ensure follow-up on pending investigations and imaging results."
+        ]
+      },
+      "saved_at": 1771927917.538162,
+      "last_accessed_at": 1771927917.538162
+    },
+    "16c68918a2ae51c1f835a7bfdafecf6659ecb9b312f90f6929bf7e39a74ea5a9": {
+      "meta": {
+        "cache_schema": 1,
+        "task": "admin_referral",
+        "patient": "P0002",
+        "note_hash": "c7a74613bc167ded08dfa31b9fff9db6dca5b65c8e81a5950a48a52c107bc982",
+        "plan_hash": "78ccc35ab60f06a5d72822eae6f6ad831b1e24345cdc1a5d01eeb5dcc14d6b13",
+        "task_params_hash": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+        "task_params": {},
+        "model": "medgemma",
+        "prompt_version": "2026-02-23-v3"
+      },
+      "payload": {
+        "patient_id": "P0002",
+        "target_condition": "pancreatic_cancer",
+        "urgency": "semi-urgent",
+        "destination_service": "Gastroenterology or Oncology",
+        "reason_for_referral": "Referral requested for persistent concerning symptoms including dyspepsia, back pain, unintentional weight loss, new-onset diabetes, early satiety, dark urine, bloating, and decreased appetite documented across multiple visits since 2019. Mildly abnormal LFTs are noted repeatedly. Lack of recent imaging is a concern, with prior imaging status unclear. Further investigation is warranted to evaluate for underlying pancreatic pathology.",
+        "attach_documents": [
+          "Recent clinic notes",
+          "Relevant labs (CMP, LFTs, Lipase)",
+          "List of pending investigations"
+        ],
+        "admin_notes": [
+          "Confirm availability of prior imaging results (CT/MRI)",
+          "Verify patient contact information"
+        ]
+      },
+      "saved_at": 1771927938.976766,
+      "last_accessed_at": 1771927938.976766
+    },
+    "832255a46226462a65159baa7291fe951ea49a3c799915e67f5533009ebbced5": {
+      "meta": {
+        "cache_schema": 1,
+        "task": "referral_letter",
+        "patient": "P0002",
+        "note_hash": "c7a74613bc167ded08dfa31b9fff9db6dca5b65c8e81a5950a48a52c107bc982",
+        "plan_hash": "78ccc35ab60f06a5d72822eae6f6ad831b1e24345cdc1a5d01eeb5dcc14d6b13",
+        "task_params_hash": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+        "task_params": {},
+        "model": "medgemma",
+        "prompt_version": "2026-02-23-v3"
+      },
+      "payload": {
+        "patient_id": "P0002",
+        "target_condition": "pancreatic_cancer",
+        "urgency": "semi-urgent",
+        "recipient": "Gastroenterology or Oncology",
+        "letter_body": "Clinic Name\nDATE: 2023-10-27\n\nTO: Gastroenterology or Oncology\nFAX: [FAX NUMBER]\n\nRE: Jordan Garcia, DOB: 1960-02-28, OHIP: 5554-564-750\n\nPatient Information:\nName: Jordan Garcia\nDOB: 1960-02-28\nOHIP: 5554-564-750\nAddress: 864 Yonge St, Richmond Hill, ON\nPhone: 905-366-7065\n\nDear Colleague,\n\nReason for Referral:\nReferral for evaluation of persistent concerning symptoms suggestive of potential pancreatic pathology.\n\nBackground:\nMs. Garcia is a 65-year-old female with a history of hyperlipidemia and hypertension. She has presented with multiple concerning symptoms since 2019, including persistent dyspepsia, intermittent back pain, unintentional weight loss, new-onset diabetes, early satiety, dark urine, bloating, and decreased appetite. Mildly abnormal LFTs have been noted repeatedly.\n\nKey Clinical Findings:\n- Persistent dyspepsia (documented across multiple visits since 2019)\n- Intermittent back pain (documented across multiple visits since 2019)\n- Unintentional weight loss (documented 2020-05-11)\n- New-onset diabetes (documented 2020-12-21)\n- Early satiety (documented 2019-05-02, 2021-05-18)\n- Dark urine (documented 2019-05-02, 2019-09-13, 2020-08-27)\n- Decreased appetite (documented 2021-05-18)\n- Bloating (documented 2020-08-27)\n- Mildly abnormal LFTs (repeatedly noted)\n- Lipase within normal range (documented 2020-08-27, 2021-05-18)\n- No critical CBC abnormalities (documented 2020-01-07)\n\nInvestigations Completed:\n- CBC (2020-01-07): No critical abnormalities.\n- CMP/LFTs (multiple dates): Mildly abnormal.\n- Lipase (2020-08-27, 2021-05-18): Within normal range.\n\nRelevant History & Medications:\n- PMH: Hyperlipidemia, Hypertension.\n- Medications: Not available in chart.\n- Imaging: No recent abdominal imaging available in chart. CT abdomen discussed in 2019-09-13 (completion status unclear). MRI deferred pending specialist advice on 2019-05-02 and 2020-08-27.\n\nRequest:\nGiven the constellation of persistent alarm symptoms and lack of recent imaging, I request your expert evaluation to investigate for underlying pancreatic pathology, including pancreatic cancer. Please review the attached documents and consider appropriate further investigations and management.\n\nSincerely,\n\n[Your Name/Clinic Name]",
+        "attachments": [
+          "Recent clinic notes",
+          "Relevant labs (CMP, LFTs, Lipase)",
+          "List of pending investigations"
+        ]
+      },
+      "saved_at": 1771928003.9784427,
+      "last_accessed_at": 1771928003.9784427
+    },
+    "96bc15c5d166e3e91f62a3ed0321903dd6493de53d45ba7be0a3e2c5d20a4683": {
+      "meta": {
+        "cache_schema": 1,
+        "task": "patient_instructions",
+        "patient": "P0002",
+        "note_hash": "c7a74613bc167ded08dfa31b9fff9db6dca5b65c8e81a5950a48a52c107bc982",
+        "plan_hash": "78ccc35ab60f06a5d72822eae6f6ad831b1e24345cdc1a5d01eeb5dcc14d6b13",
+        "task_params_hash": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+        "task_params": {},
+        "model": "medgemma",
+        "prompt_version": "2026-02-23-v3"
+      },
+      "payload": {
+        "patient_id": "P0002",
+        "target_condition": "pancreatic_cancer",
+        "horizon_months": 24,
+        "instructions": [
+          "Follow up with your specialist as recommended.",
+          "Keep track of your symptoms, such as changes in appetite, weight, pain, or urine color.",
+          "Contact your doctor if you develop jaundice (yellowing of skin or eyes).",
+          "Contact your doctor if you experience severe abdominal pain.",
+          "Contact your doctor if you have significant unintentional weight loss.",
+          "Attend all scheduled appointments and complete any recommended tests or imaging.",
+          "Discuss any new or worsening symptoms with your healthcare provider.",
+          "Ensure your specialist receives any requested prior imaging results."
+        ]
+      },
+      "saved_at": 1771928022.424351,
+      "last_accessed_at": 1771928022.424351
+    },
+    "731db98d0d9f5899cd40a7b3d968ffb05f5ed1906e8c13bb26c3e35a05af4d4b": {
+      "meta": {
+        "cache_schema": 1,
+        "task": "clinician_summary",
+        "patient": "P0003",
+        "note_hash": "64b41557cd5e0f90cd271df56f0541748804808a92ab0c10b775ea7a6f873f17",
+        "plan_hash": "78ccc35ab60f06a5d72822eae6f6ad831b1e24345cdc1a5d01eeb5dcc14d6b13",
+        "task_params_hash": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+        "task_params": {},
+        "model": "medgemma",
+        "prompt_version": "2026-02-23-v3"
+      },
+      "payload": {
+        "patient_id": "P0003",
+        "target_condition": "pancreatic_cancer",
+        "horizon_months": 24,
+        "summary_for_chart": "Mr. Wong is a 69-year-old male with persistent dyspepsia, dark urine, decreased appetite, and new-onset diabetes since 2019. Multiple abdominal ultrasounds have been requested across visits but completion status is unclear. A CT abdomen was discussed in December 2020, but its completion is also uncertain. Lipase has been within normal range, but ferritin results remain pending from July and December 2020. Given the constellation of symptoms and incomplete investigations, follow-up is warranted to clarify the status of imaging and labs and reassess symptoms.",
+        "suggested_orders": [
+          "Confirm completion status of previously requested abdominal ultrasound",
+          "Confirm completion status of CT abdomen discussed in Dec 2020",
+          "Review pending ferritin results from July and Dec 2020",
+          "Repeat CMP if not recently done"
+        ],
+        "suggested_referrals": [
+          "Consider GI referral if imaging and labs are unrevealing or symptoms persist/worsen"
+        ],
+        "safety_netting": [
+          "Document any new symptoms, especially jaundice, significant weight loss, or worsening abdominal pain.",
+          "Advise patient to return if symptoms worsen or new concerning symptoms develop.",
+          "Ensure follow-up to review imaging and lab results."
+        ]
+      },
+      "saved_at": 1771928052.4746242,
+      "last_accessed_at": 1771928052.4746242
+    },
+    "ebea779656e8840777fc4ca0dfb1d6a9620c380648f6feb9ab6ef4136a148690": {
+      "meta": {
+        "cache_schema": 1,
+        "task": "admin_referral",
+        "patient": "P0003",
+        "note_hash": "64b41557cd5e0f90cd271df56f0541748804808a92ab0c10b775ea7a6f873f17",
+        "plan_hash": "78ccc35ab60f06a5d72822eae6f6ad831b1e24345cdc1a5d01eeb5dcc14d6b13",
+        "task_params_hash": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+        "task_params": {},
+        "model": "medgemma",
+        "prompt_version": "2026-02-23-v3"
+      },
+      "payload": {
+        "patient_id": "P0003",
+        "target_condition": "pancreatic_cancer",
+        "urgency": "semi-urgent",
+        "destination_service": "GI referral",
+        "reason_for_referral": "Referral requested for persistent dyspepsia, dark urine, decreased appetite, and new-onset diabetes in a 69-year-old male. Multiple abdominal ultrasounds have been requested across visits, and a CT abdomen was discussed in December 2020, but completion status is unclear. Pending ferritin results from July and December 2020 also remain outstanding, contributing to the semi-urgent nature due to incomplete investigation status.",
+        "attach_documents": [
+          "Recent clinic notes",
+          "Relevant labs/imaging (if available)",
+          "List of pending investigations"
+        ],
+        "admin_notes": [
+          "Confirm completion status of abdominal ultrasound and CT abdomen.",
+          "Follow up on pending ferritin results.",
+          "Ensure referral contact details are accurate."
+        ]
+      },
+      "saved_at": 1771928072.6275284,
+      "last_accessed_at": 1771928072.6275284
+    },
+    "4d74c1775826dc5da048cd3fbe0309e9bfe86b5057bbc8fde37bfee8fcfd6190": {
+      "meta": {
+        "cache_schema": 1,
+        "task": "referral_letter",
+        "patient": "P0003",
+        "note_hash": "64b41557cd5e0f90cd271df56f0541748804808a92ab0c10b775ea7a6f873f17",
+        "plan_hash": "78ccc35ab60f06a5d72822eae6f6ad831b1e24345cdc1a5d01eeb5dcc14d6b13",
+        "task_params_hash": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+        "task_params": {},
+        "model": "medgemma",
+        "prompt_version": "2026-02-23-v3"
+      },
+      "payload": {
+        "patient_id": "P0003",
+        "target_condition": "pancreatic_cancer",
+        "urgency": "semi-urgent",
+        "recipient": "GI referral",
+        "letter_body": "Dr. [Recipient Name]\n\nDATE: 2024-07-26\n\nTO: GI Referral\n\nFAX: [Fax Number]\n\nRE: Jordan Wong, DOB: 1956-03-17, OHIP: 2796-256-742\n\nPatient Information:\nName: Jordan Wong\nDOB: 1956-03-17\nOHIP: 2796-256-742\nAddress: 173 Woodbine Ave, Richmond Hill, ON\nPhone: 905-896-7916\n\nDear Dr. [Recipient Name],\n\nReason for Referral:\nReferral for persistent dyspepsia, dark urine, decreased appetite, and new-onset diabetes in a 69-year-old male.\n\nBackground:\nMr. Wong is a 69-year-old male with a history of NAFLD and GERD. He has presented with persistent dyspepsia and dark urine since 2019. He developed new-onset diabetes in 2020. His lipase has been within normal range.\n\nKey Clinical Findings:\n- Persistent dyspepsia since 2019\n- Dark urine documented across multiple visits (2019-08-17, 2019-12-14, 2020-12-14)\n- Decreased appetite noted (2020-03-27)\n- New-onset diabetes diagnosed in 2020\n- Lipase within normal range (2020-03-27)\n\nInvestigations Completed:\n- Multiple abdominal ultrasounds requested across visits (2019-08-17, 2019-12-14, 2020-03-27, 2020-07-23), completion status unclear.\n- CT abdomen discussed in December 2020, completion status unclear.\n\nRelevant History & Medications:\n- PMH: NAFLD, GERD\n- Medications: Not available in chart\n\nRequest:\nGiven the persistent symptoms, new-onset diabetes, and incomplete investigation status, I am referring Mr. Wong for further evaluation, including clarification of imaging results and consideration for further investigations as appropriate.\n\nSincerely,\n\n[Your Name/Clinic Name]",
+        "attachments": [
+          "Recent clinic notes",
+          "Relevant labs/imaging (if available)",
+          "List of pending investigations"
+        ]
+      },
+      "saved_at": 1771928122.0617387,
+      "last_accessed_at": 1771928122.0617387
+    },
+    "6c4bb86644d4fc0ee06fc2ffa18797433ffea14fe83360c189913bd0e731138d": {
+      "meta": {
+        "cache_schema": 1,
+        "task": "patient_instructions",
+        "patient": "P0003",
+        "note_hash": "64b41557cd5e0f90cd271df56f0541748804808a92ab0c10b775ea7a6f873f17",
+        "plan_hash": "78ccc35ab60f06a5d72822eae6f6ad831b1e24345cdc1a5d01eeb5dcc14d6b13",
+        "task_params_hash": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+        "task_params": {},
+        "model": "medgemma",
+        "prompt_version": "2026-02-23-v3"
+      },
+      "payload": {
+        "patient_id": "P0003",
+        "target_condition": "pancreatic_cancer",
+        "horizon_months": 24,
+        "instructions": [
+          "Please follow up with your doctor to check on the status of your abdominal ultrasound and CT scan.",
+          "Let your doctor know if you have any new symptoms or if your current symptoms get worse.",
+          "Keep track of any changes in your appetite, weight, or urine color.",
+          "If you develop yellowing of the skin or eyes (jaundice), seek medical attention promptly.",
+          "Continue managing your diabetes as advised by your doctor.",
+          "Follow up with your doctor to review any pending lab results, like ferritin.",
+          "Attend your scheduled follow-up appointments to discuss your symptoms and test results."
+        ]
+      },
+      "saved_at": 1771928138.7432754,
+      "last_accessed_at": 1771928138.7432754
+    },
+    "de02fb2de033d961de9f312016cee4a667690f58fd377077c14364db60cca51f": {
+      "meta": {
+        "cache_schema": 1,
+        "task": "clinician_summary",
+        "patient": "P0004",
+        "note_hash": "1f83148ce9a7eb624686cccd92fcb4c62740acdc4b006a285ba0b7535dda593b",
+        "plan_hash": "78ccc35ab60f06a5d72822eae6f6ad831b1e24345cdc1a5d01eeb5dcc14d6b13",
+        "task_params_hash": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+        "task_params": {},
+        "model": "medgemma",
+        "prompt_version": "2026-02-23-v3"
+      },
+      "payload": {
+        "patient_id": "P0004",
+        "target_condition": "pancreatic_cancer",
+        "horizon_months": 24,
+        "summary_for_chart": "This 74-year-old female patient presents with multiple concerning symptoms over the past two years, including unintentional weight loss, new-onset diabetes with worsening glycemia, pruritus, dark urine, epigastric discomfort, and intermittent back pain. Mildly abnormal LFTs have been noted repeatedly. While imaging like CT abdomen has been discussed, its completion status is unclear across multiple visits, and no recent imaging is available in the chart. Pending investigations include Ferritin and an Abdominal ultrasound. Given the constellation of symptoms and lack of definitive imaging, close follow-up is warranted to evaluate for underlying malignancy.",
+        "suggested_orders": [
+          "Review results of pending Ferritin and Abdominal ultrasound",
+          "If imaging was completed, obtain and review prior CT abdomen results",
+          "Consider repeat CMP if symptoms persist or worsen"
+        ],
+        "suggested_referrals": [
+          "Consider referral to Gastroenterology or Oncology if concerning symptoms persist or imaging is abnormal"
+        ],
+        "safety_netting": [
+          "Document any new or worsening symptoms, especially jaundice, severe abdominal pain, or significant changes in bowel habits.",
+          "Ensure timely follow-up after pending investigations are completed.",
+          "Provide clear return precautions for worsening symptoms."
+        ]
+      },
+      "saved_at": 1771928164.5254009,
+      "last_accessed_at": 1771928164.5254009
+    },
+    "37af75aa9f9d7530e09f93021a21490df0b1ff60837c86ef603f906af785d765": {
+      "meta": {
+        "cache_schema": 1,
+        "task": "admin_referral",
+        "patient": "P0004",
+        "note_hash": "1f83148ce9a7eb624686cccd92fcb4c62740acdc4b006a285ba0b7535dda593b",
+        "plan_hash": "78ccc35ab60f06a5d72822eae6f6ad831b1e24345cdc1a5d01eeb5dcc14d6b13",
+        "task_params_hash": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+        "task_params": {},
+        "model": "medgemma",
+        "prompt_version": "2026-02-23-v3"
+      },
+      "payload": {
+        "patient_id": "P0004",
+        "target_condition": "pancreatic_cancer",
+        "urgency": "semi-urgent",
+        "destination_service": "Gastroenterology or Oncology",
+        "reason_for_referral": "Referral requested for evaluation of persistent concerning symptoms including unintentional weight loss, new-onset diabetes with worsening glycemia, pruritus, dark urine, epigastric discomfort, and intermittent back pain over the past two years. Mildly abnormal LFTs are noted repeatedly. Lack of recent imaging and unclear status of prior CT abdomen warrants further investigation to rule out underlying malignancy.",
+        "attach_documents": [
+          "Recent clinic notes",
+          "Relevant labs (CMP, A1c, Ferritin)",
+          "Abdominal ultrasound results (if available)",
+          "Prior CT abdomen results (if available)"
+        ],
+        "admin_notes": [
+          "Confirm status of pending Ferritin and Abdominal ultrasound.",
+          "Attempt to locate prior CT abdomen results.",
+          "Verify referral contact details."
+        ]
+      },
+      "saved_at": 1771928185.2086096,
+      "last_accessed_at": 1771928185.2086096
+    },
+    "61818c444f06db9cc899cf55c5df5f2c54f493c036678ca91b82b9aeee9c1b6a": {
+      "meta": {
+        "cache_schema": 1,
+        "task": "referral_letter",
+        "patient": "P0004",
+        "note_hash": "1f83148ce9a7eb624686cccd92fcb4c62740acdc4b006a285ba0b7535dda593b",
+        "plan_hash": "78ccc35ab60f06a5d72822eae6f6ad831b1e24345cdc1a5d01eeb5dcc14d6b13",
+        "task_params_hash": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+        "task_params": {},
+        "model": "medgemma",
+        "prompt_version": "2026-02-23-v3"
+      },
+      "payload": {
+        "patient_id": "P0004",
+        "target_condition": "pancreatic_cancer",
+        "urgency": "semi-urgent",
+        "recipient": "Gastroenterology or Oncology",
+        "letter_body": "Clinic Name\nDATE: 2024-07-26\n\nTO: Gastroenterology or Oncology\nFAX: [Insert Fax Number]\n\nRE: Referral for Riley Li, DOB: 1951-06-25, OHIP: 1009-713-431\n\nPatient Information:\nName: Riley Li\nDOB: 1951-06-25\nOHIP: 1009-713-431\nAddress: 510 Maple Ave, Richmond Hill, ON\nPhone: 905-314-6947\n\nDear Colleague,\n\nReason for Referral:\nReferral for evaluation of persistent concerning symptoms including unintentional weight loss, new-onset diabetes with worsening glycemia, pruritus, dark urine, epigastric discomfort, and intermittent back pain over the past two years. Mildly abnormal LFTs are noted repeatedly. Lack of recent imaging and unclear status of prior CT abdomen warrants further investigation to rule out underlying malignancy.\n\nBackground:\nMs. Li is a 74-year-old female with a history of type 2 diabetes and NAFLD. She has presented with multiple concerning symptoms over the past two years.\n\nKey Clinical Findings:\n- Unintentional weight loss (documented 2019-05-03, 2020-08-27)\n- New-onset diabetes (noted 2019-08-30)\n- Worsening glycemia (A1c increased 2019-08-30, 2020-04-21)\n- Pruritus (documented 2019-05-03, 2020-04-21)\n- Dark urine (documented 2020-04-21)\n- Epigastric discomfort (documented 2020-11-26, 2021-04-28)\n- Intermittent back pain (documented 2019-12-11, 2021-04-28)\n- Mildly abnormal LFTs (documented 2019-05-03, 2020-08-27)\n\nInvestigations Completed:\n- CMP (repeatedly, showing mildly abnormal LFTs)\n- A1c (increased over time)\n- CBC (reviewed 2021-04-28, no critical abnormalities)\n- Abdominal ultrasound requested (2021-04-28, pending)\n- Ferritin pending (2020-11-26)\n\nRelevant History & Medications:\nPMH: Type 2 diabetes, NAFLD.\nMedications: Not available in chart.\n\nRequest:\nGiven the constellation of symptoms and lack of definitive imaging, we request your expert evaluation to investigate the underlying cause, particularly to rule out pancreatic malignancy. Please review any pending investigations (Ferritin, Abdominal ultrasound) and consider appropriate imaging (e.g., CT abdomen, MRI/MRCP) if not already completed or if results are inconclusive.\n\nSincerely,\n[Your Name/Clinic Name]",
+        "attachments": [
+          "Recent clinic notes",
+          "Relevant labs (CMP, A1c, Ferritin)",
+          "Abdominal ultrasound results (if available)",
+          "Prior CT abdomen results (if available)"
+        ]
+      },
+      "saved_at": 1771928247.0087287,
+      "last_accessed_at": 1771928247.0087287
+    },
+    "5d099b1c0a3e73532ace36417ea1c1d4b4fba9e39911abc12f8d74d03bdd462c": {
+      "meta": {
+        "cache_schema": 1,
+        "task": "patient_instructions",
+        "patient": "P0004",
+        "note_hash": "1f83148ce9a7eb624686cccd92fcb4c62740acdc4b006a285ba0b7535dda593b",
+        "plan_hash": "78ccc35ab60f06a5d72822eae6f6ad831b1e24345cdc1a5d01eeb5dcc14d6b13",
+        "task_params_hash": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+        "task_params": {},
+        "model": "medgemma",
+        "prompt_version": "2026-02-23-v3"
+      },
+      "payload": {
+        "patient_id": "P0004",
+        "target_condition": "pancreatic_cancer",
+        "horizon_months": 24,
+        "instructions": [
+          "Follow up with your doctor after your pending tests (Ferritin and Abdominal ultrasound) are completed.",
+          "If you have had imaging like a CT scan in the past, please help your doctor find those results.",
+          "Contact your doctor if you experience new or worsening symptoms, such as jaundice (yellowing of skin or eyes), severe abdominal pain, or significant changes in bowel habits.",
+          "Keep track of any changes in your symptoms, including weight loss, back pain, or abdominal discomfort.",
+          "Continue managing your diabetes as advised by your doctor.",
+          "Attend all scheduled follow-up appointments."
+        ]
+      },
+      "saved_at": 1771928263.548638,
+      "last_accessed_at": 1771928263.548638
+    },
+    "2c2da63014b427eb32ec3d7e7ba69484aab9d7fa85c7c273295d549f5e668f26": {
+      "meta": {
+        "cache_schema": 1,
+        "task": "clinician_summary",
+        "patient": "P0005",
+        "note_hash": "bf2b108fa790117be01afefa2a2f7700c01b78c3cb0fcd92463bca0d5761b2ef",
+        "plan_hash": "78ccc35ab60f06a5d72822eae6f6ad831b1e24345cdc1a5d01eeb5dcc14d6b13",
+        "task_params_hash": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+        "task_params": {},
+        "model": "medgemma",
+        "prompt_version": "2026-02-23-v3"
+      },
+      "payload": {
+        "patient_id": "P0005",
+        "target_condition": "pancreatic_cancer",
+        "horizon_months": 24,
+        "summary_for_chart": "Mr. Li is a 70-year-old male with multiple concerning longitudinal symptoms including unintentional weight loss (documented 2019-05-02, 2021-05-19), new-onset diabetes (2020-09-14), persistent epigastric discomfort/dyspepsia (2019-09-19, 2020-09-14, 2021-05-19), and pruritus (2021-09-08). Mildly abnormal LFTs have been noted on multiple occasions (2021-05-19, 2021-09-08). A CT abdomen was discussed multiple times, but its completion status remains unclear. While lipase has been within normal limits (2020-05-02, 2020-09-14) and no jaundice is documented, the constellation of symptoms warrants further investigation to rule out pancreatic cancer. Follow-up is crucial to clarify the status of prior investigations and determine the need for further workup.",
+        "suggested_orders": [
+          "Review prior imaging results, including CT abdomen status",
+          "Repeat LFTs",
+          "Consider abdominal MRI if CT abdomen was not completed or is inconclusive"
+        ],
+        "suggested_referrals": [
+          "Referral to Gastroenterology or Oncology for evaluation of persistent symptoms and concerning findings"
+        ],
+        "safety_netting": [
+          "Monitor for worsening symptoms, including jaundice, severe abdominal pain, or significant changes in bowel habits.",
+          "Ensure follow-up occurs after pending investigations are completed.",
+          "Document clear return precautions for worsening symptoms."
+        ]
+      },
+      "saved_at": 1771928297.1799154,
+      "last_accessed_at": 1771928297.1799154
+    },
+    "fbd8ba741aee81cfdc9e9cda9601065a1881d92c334e1978115a7ad7bb4f37ac": {
+      "meta": {
+        "cache_schema": 1,
+        "task": "admin_referral",
+        "patient": "P0005",
+        "note_hash": "bf2b108fa790117be01afefa2a2f7700c01b78c3cb0fcd92463bca0d5761b2ef",
+        "plan_hash": "78ccc35ab60f06a5d72822eae6f6ad831b1e24345cdc1a5d01eeb5dcc14d6b13",
+        "task_params_hash": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+        "task_params": {},
+        "model": "medgemma",
+        "prompt_version": "2026-02-23-v3"
+      },
+      "payload": {
+        "patient_id": "P0005",
+        "target_condition": "pancreatic_cancer",
+        "urgency": "semi-urgent",
+        "destination_service": "Gastroenterology or Oncology",
+        "reason_for_referral": "Referral requested for persistent concerning symptoms including unintentional weight loss (documented 2019-05-02, 2021-05-19), new-onset diabetes (2020-09-14), persistent epigastric discomfort/dyspepsia (2019-09-19, 2020-09-14, 2021-05-19), and pruritus (2021-09-08). Mildly abnormal LFTs have been noted on multiple occasions (2021-05-19, 2021-09-08). The constellation of symptoms warrants further investigation to rule out pancreatic cancer.",
+        "attach_documents": [
+          "Recent clinic notes",
+          "Relevant labs/imaging",
+          "List of medications"
+        ],
+        "admin_notes": [
+          "Confirm status of prior CT abdomen",
+          "Check if MRI was completed",
+          "Verify referral contact details"
+        ]
+      },
+      "saved_at": 1771928322.8822813,
+      "last_accessed_at": 1771928322.8822813
+    },
+    "687ddfe04a274a5588a4291ff79c89aeb19d9a4098053ecd93fef9744029ec01": {
+      "meta": {
+        "cache_schema": 1,
+        "task": "referral_letter",
+        "patient": "P0005",
+        "note_hash": "bf2b108fa790117be01afefa2a2f7700c01b78c3cb0fcd92463bca0d5761b2ef",
+        "plan_hash": "78ccc35ab60f06a5d72822eae6f6ad831b1e24345cdc1a5d01eeb5dcc14d6b13",
+        "task_params_hash": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+        "task_params": {},
+        "model": "medgemma",
+        "prompt_version": "2026-02-23-v3"
+      },
+      "payload": {
+        "patient_id": "P0005",
+        "target_condition": "pancreatic_cancer",
+        "urgency": "semi-urgent",
+        "recipient": "Gastroenterology or Oncology",
+        "letter_body": "Family Medicine Clinic\nDATE: 2023-10-27\n\nTO: Gastroenterology or Oncology\nFAX: [Insert Fax Number]\n\nRE: Jordan Li, DOB: 1956-02-02, OHIP: 4899-385-785\n\nPatient Information:\nName: Jordan Li\nDOB: 1956-02-02\nOHIP #: 4899-385-785\nAddress: 507 Bayview Ave, Richmond Hill, ON\nPhone: 905-752-3167\n\nDear Colleague,\n\nReason for Referral:\nReferral for evaluation of persistent concerning symptoms including unintentional weight loss, new-onset diabetes, persistent epigastric discomfort/dyspepsia, and pruritus, to rule out pancreatic cancer.\n\nBackground:\nMr. Li is a 70-year-old male with a history of GERD. He presents with multiple longitudinal concerns noted over the past several years.\n\nKey Clinical Findings:\n- Unintentional weight loss documented on 2019-05-02 and 2021-05-19.\n- New-onset diabetes mellitus diagnosed on 2020-09-14.\n- Persistent epigastric discomfort/dyspepsia noted on 2019-09-19, 2020-09-14, and 2021-05-19.\n- Pruritus noted on 2021-09-08.\n- Mildly abnormal LFTs noted on 2021-05-19 and 2021-09-08.\n- Dark urine noted on 2019-05-02.\n- Decreased appetite noted on 2019-05-02 and 2019-12-25.\n\nInvestigations Completed:\n- Lipase levels have been within normal limits on 2020-05-02 and 2020-09-14.\n- CBC reviewed on 2019-12-25 and 2020-12-20 showed no critical abnormalities.\n- Abdominal ultrasound requested on 2019-09-19 and 2020-12-20 (results not available in chart).\n- CT abdomen discussed multiple times (2019-12-25, 2020-05-02, 2020-09-14, 2021-05-19), but completion status is unclear.\n- MRI deferred pending specialist advice on 2019-05-02 and 2021-09-08.\n\nRelevant History & Medications:\n- PMH: GERD.\n- Medications: List of medications attached.\n\nRequest:\nGiven the constellation of persistent symptoms (weight loss, new diabetes, dyspepsia, pruritus) and mildly abnormal LFTs, further investigation is warranted to rule out pancreatic malignancy. Please assess Mr. Li and consider appropriate imaging (e.g., MRI, CT abdomen if not completed) and further workup as indicated.\n\nSincerely,\n\n[Your Name/Clinic Name]",
+        "attachments": [
+          "Recent clinic notes",
+          "Relevant labs/imaging",
+          "List of medications"
+        ]
+      },
+      "saved_at": 1771928386.6133952,
+      "last_accessed_at": 1771928386.6133952
+    },
+    "fded5ba60bfc977a2fb2b1bd533209c384371423f99e918ec3dce94d98c1d292": {
+      "meta": {
+        "cache_schema": 1,
+        "task": "patient_instructions",
+        "patient": "P0005",
+        "note_hash": "bf2b108fa790117be01afefa2a2f7700c01b78c3cb0fcd92463bca0d5761b2ef",
+        "plan_hash": "78ccc35ab60f06a5d72822eae6f6ad831b1e24345cdc1a5d01eeb5dcc14d6b13",
+        "task_params_hash": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+        "task_params": {},
+        "model": "medgemma",
+        "prompt_version": "2026-02-23-v3"
+      },
+      "payload": {
+        "patient_id": "P0005",
+        "target_condition": "pancreatic_cancer",
+        "horizon_months": 24,
+        "instructions": [
+          "Follow up with your doctor to discuss your persistent symptoms like weight loss, indigestion, and new diabetes.",
+          "Complete any recommended tests, such as repeat liver function tests (LFTs) or imaging like an MRI or CT scan.",
+          "If you have a referral to a specialist (like Gastroenterology or Oncology), make sure to schedule and attend that appointment.",
+          "Let your doctor know if you develop new symptoms like jaundice (yellowing of skin or eyes), severe abdominal pain, or changes in bowel habits.",
+          "Continue to monitor your symptoms and report any significant changes to your healthcare team.",
+          "Keep track of your appointments and test results.",
+          "Discuss any concerns or questions you have about your health with your doctor.",
+          "Follow your doctor's advice regarding managing your diabetes and other health conditions."
+        ]
+      },
+      "saved_at": 1771928406.8865674,
+      "last_accessed_at": 1771928406.8865674
+    },
+    "e7b55b9b8c938d18c470e1a0d7cbfa131be85bef04ba5efcf200b645f22a601b": {
+      "meta": {
+        "cache_schema": 1,
+        "task": "clinician_summary",
+        "patient": "P0006",
+        "note_hash": "cb33a3dfadc271f88c6778baf5b1b5deb45138ff9187ff10d409914dde9b5c81",
+        "plan_hash": "78ccc35ab60f06a5d72822eae6f6ad831b1e24345cdc1a5d01eeb5dcc14d6b13",
+        "task_params_hash": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+        "task_params": {},
+        "model": "medgemma",
+        "prompt_version": "2026-02-23-v3"
+      },
+      "payload": {
+        "patient_id": "P0006",
+        "target_condition": "pancreatic_cancer",
+        "horizon_months": 24,
+        "summary_for_chart": "This 80-year-old female patient presents with multiple concerning symptoms over the past two years, including unintentional weight loss, persistent nausea, early satiety, and decreased appetite. Mildly abnormal LFTs have been noted on multiple occasions, and dark urine was reported in 2020. Intermittent back pain was also noted in 2020. While imaging like abdominal ultrasound and CT abdomen have been discussed or requested, the status of these investigations is unclear, and no recent imaging is available in the chart. Given the persistence of alarm symptoms and the lack of definitive imaging, further evaluation is warranted to investigate potential underlying causes, including pancreatic cancer.",
+        "suggested_orders": [
+          "Review prior imaging results (CT abdomen, ultrasound, MRI) if available",
+          "Repeat CMP and LFTs",
+          "Consider CA 19-9 if appropriate based on clinical assessment"
+        ],
+        "suggested_referrals": [
+          "Referral to Gastroenterology or Oncology for further evaluation of persistent symptoms and potential imaging"
+        ],
+        "safety_netting": [
+          "Document any new or worsening symptoms, especially jaundice, severe abdominal pain, or changes in bowel habits.",
+          "Ensure follow-up occurs after pending investigations are completed.",
+          "Provide clear return precautions for worsening symptoms."
+        ]
+      },
+      "saved_at": 1771928433.0874803,
+      "last_accessed_at": 1771928433.0874803
+    },
+    "3f7a4dc9d2d482f8df8238615cef8eec9230e4aa8d2de4836a9445bf1294c6eb": {
+      "meta": {
+        "cache_schema": 1,
+        "task": "admin_referral",
+        "patient": "P0006",
+        "note_hash": "cb33a3dfadc271f88c6778baf5b1b5deb45138ff9187ff10d409914dde9b5c81",
+        "plan_hash": "78ccc35ab60f06a5d72822eae6f6ad831b1e24345cdc1a5d01eeb5dcc14d6b13",
+        "task_params_hash": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+        "task_params": {},
+        "model": "medgemma",
+        "prompt_version": "2026-02-23-v3"
+      },
+      "payload": {
+        "patient_id": "P0006",
+        "target_condition": "pancreatic_cancer",
+        "urgency": "semi-urgent",
+        "destination_service": "Gastroenterology or Oncology",
+        "reason_for_referral": "Referral requested for persistent concerning symptoms including unintentional weight loss, nausea, early satiety, and decreased appetite documented over the past two years. Mildly abnormal LFTs and dark urine were also noted. Given the persistence of these alarm symptoms and lack of recent definitive imaging, further investigation is warranted.",
+        "attach_documents": [
+          "Recent clinic notes",
+          "Relevant labs (CMP, LFTs)",
+          "List of requested/pending imaging (ultrasound, CT, MRI)"
+        ],
+        "admin_notes": [
+          "Confirm status of prior imaging requests (ultrasound, CT, MRI)",
+          "Verify destination service preference if possible",
+          "Ensure patient understands reason for referral and next steps"
+        ]
+      },
+      "saved_at": 1771928453.092475,
+      "last_accessed_at": 1771928453.092475
+    },
+    "2980fb98cc7faabe13b66040ea51ca57c7d0b0e51e7ede2ef08ce6512a054b9e": {
+      "meta": {
+        "cache_schema": 1,
+        "task": "referral_letter",
+        "patient": "P0006",
+        "note_hash": "cb33a3dfadc271f88c6778baf5b1b5deb45138ff9187ff10d409914dde9b5c81",
+        "plan_hash": "78ccc35ab60f06a5d72822eae6f6ad831b1e24345cdc1a5d01eeb5dcc14d6b13",
+        "task_params_hash": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+        "task_params": {},
+        "model": "medgemma",
+        "prompt_version": "2026-02-23-v3"
+      },
+      "payload": {
+        "patient_id": "P0006",
+        "target_condition": "pancreatic_cancer",
+        "urgency": "semi-urgent",
+        "recipient": "Gastroenterology or Oncology",
+        "letter_body": "Dr. [Recipient Name/Service],\n\nDATE: 2024-07-26\n\nTO: Gastroenterology or Oncology\nFAX: [Fax Number]\n\nRE: Jamie Chen, DOB: 1945-03-13, OHIP: 8454-392-533\n\nPatient Information:\nName: Jamie Chen\nDOB: 1945-03-13\nOHIP: 8454-392-533\nAddress: 723 Leslie St, Richmond Hill, ON\nPhone: 905-769-8973\n\nDear Dr. [Recipient Name/Service],\n\nReason for Referral:\nReferral for evaluation of persistent concerning symptoms including unintentional weight loss, nausea, early satiety, and decreased appetite over the past two years. Mildly abnormal LFTs and dark urine were also noted. Given the persistence of these alarm symptoms and lack of recent definitive imaging, further investigation is warranted.\n\nBackground:\nThis is an 80-year-old female with a history of type 2 diabetes and hypertension. She has presented with multiple concerning symptoms over the past two years.\n\nKey Clinical Findings:\n- Unintentional weight loss (documented 2019-12-09, 2020-05-12, 2021-01-08)\n- Persistent nausea (documented 2019-04-13, 2019-09-14, 2019-12-09, 2020-05-12)\n- Early satiety (documented 2019-04-13, 2020-08-09)\n- Decreased appetite (documented 2021-01-08)\n- Mildly abnormal LFTs (documented 2019-12-09, 2020-05-12)\n- Dark urine (documented 2020-05-12)\n- Intermittent back pain (documented 2020-08-09)\n\nInvestigations Completed:\n- CBC reviewed (2019-04-13): No critical abnormalities documented.\n- LFTs reviewed (2019-12-09, 2020-05-12): Mildly abnormal.\n- Ferritin pending (2019-09-14, 2020-08-09).\n- Repeat CMP planned (2021-01-08).\n\nRelevant History & Medications:\nPMH: Type 2 diabetes, hypertension.\nMedications: Not available in chart.\n\nRequest:\nWe request your expert consultation to evaluate Ms. Chen's persistent symptoms and determine the need for further investigation, including appropriate imaging (e.g., CT abdomen, MRI, EUS) and potential endoscopic evaluation. Please review any prior imaging results if available.\n\nSincerely,\n\n[Your Name/Clinic Name]",
+        "attachments": [
+          "Recent clinic notes",
+          "Relevant labs (CMP, LFTs)",
+          "List of requested/pending imaging (ultrasound, CT, MRI)"
+        ]
+      },
+      "saved_at": 1771928513.138916,
+      "last_accessed_at": 1771928513.138916
+    },
+    "81a4708709da798110a018df731fc0bc9707dd8688a4a8095792695cbf12ab4a": {
+      "meta": {
+        "cache_schema": 1,
+        "task": "patient_instructions",
+        "patient": "P0006",
+        "note_hash": "cb33a3dfadc271f88c6778baf5b1b5deb45138ff9187ff10d409914dde9b5c81",
+        "plan_hash": "78ccc35ab60f06a5d72822eae6f6ad831b1e24345cdc1a5d01eeb5dcc14d6b13",
+        "task_params_hash": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+        "task_params": {},
+        "model": "medgemma",
+        "prompt_version": "2026-02-23-v3"
+      },
+      "payload": {
+        "patient_id": "P0006",
+        "target_condition": "pancreatic_cancer",
+        "horizon_months": 24,
+        "instructions": [
+          "Follow up with your specialist as recommended.",
+          "Keep track of any new or worsening symptoms.",
+          "Contact your doctor if you experience severe abdominal pain, jaundice (yellowing of skin or eyes), or significant changes in bowel habits.",
+          "Attend all scheduled appointments and complete any recommended tests.",
+          "Discuss any concerns or questions you have with your healthcare team.",
+          "Let your doctor know if you have difficulty completing recommended tests or attending appointments."
+        ]
+      },
+      "saved_at": 1771928527.3211606,
+      "last_accessed_at": 1771928527.3211606
+    },
+    "feefe5f1cc4caf609befa77ced4c2a2b49bdfd27148375e88819b904b07d9573": {
+      "meta": {
+        "cache_schema": 1,
+        "task": "clinician_summary",
+        "patient": "P0007",
+        "note_hash": "78896c3b7fcc3216ff0c0241ff3659d472976f2dacd2a6826d8b9d0ea32a64fc",
+        "plan_hash": "78ccc35ab60f06a5d72822eae6f6ad831b1e24345cdc1a5d01eeb5dcc14d6b13",
+        "task_params_hash": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+        "task_params": {},
+        "model": "medgemma",
+        "prompt_version": "2026-02-23-v3"
+      },
+      "payload": {
+        "patient_id": "P0007",
+        "target_condition": "pancreatic_cancer",
+        "horizon_months": 24,
+        "summary_for_chart": "Mr. Chen is a 67-year-old male with multiple concerning symptoms potentially related to pancreatic cancer, including unintentional weight loss, new-onset diabetes, persistent nausea, intermittent back pain, dark urine, bloating, and dyspepsia, documented across multiple visits since 2019. He also has a family history of pancreatic/GI malignancy in a first-degree relative and an increased A1c. While CBCs have been unremarkable, prior imaging status is unclear, and an abdominal ultrasound was requested in May 2020 but its results are not documented. The persistence of multiple alarm symptoms warrants further investigation to rule out malignancy, especially given the family history. Follow-up is crucial to assess the results of pending investigations and determine the need for further workup.",
+        "suggested_orders": [
+          "Review results of abdominal ultrasound ordered May 15, 2020",
+          "If ultrasound is non-diagnostic or unavailable, consider CT abdomen/pelvis with pancreatic protocol",
+          "Repeat CMP to assess liver function and bilirubin"
+        ],
+        "suggested_referrals": [
+          "Consider referral to Gastroenterology or Oncology if imaging is concerning or symptoms persist/worsen"
+        ],
+        "safety_netting": [
+          "Document any new or worsening symptoms, particularly jaundice, severe abdominal pain, or significant changes in bowel habits.",
+          "Ensure patient understands return precautions for worsening symptoms.",
+          "Follow up closely on pending investigations and imaging results."
+        ]
+      },
+      "saved_at": 1771928555.6245866,
+      "last_accessed_at": 1771928555.6245866
+    },
+    "7e455476bad08cb6f9bc4308e209b6242f7f66fb39c627949ef1a3be9be13196": {
+      "meta": {
+        "cache_schema": 1,
+        "task": "admin_referral",
+        "patient": "P0007",
+        "note_hash": "78896c3b7fcc3216ff0c0241ff3659d472976f2dacd2a6826d8b9d0ea32a64fc",
+        "plan_hash": "78ccc35ab60f06a5d72822eae6f6ad831b1e24345cdc1a5d01eeb5dcc14d6b13",
+        "task_params_hash": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+        "task_params": {},
+        "model": "medgemma",
+        "prompt_version": "2026-02-23-v3"
+      },
+      "payload": {
+        "patient_id": "P0007",
+        "target_condition": "pancreatic_cancer",
+        "urgency": "semi-urgent",
+        "destination_service": "Gastroenterology or Oncology",
+        "reason_for_referral": "Referral requested for persistent concerning symptoms potentially related to pancreatic cancer, including unintentional weight loss, new-onset diabetes, persistent nausea, intermittent back pain, dark urine, bloating, and dyspepsia, documented across multiple visits since 2019. The patient also has a family history of pancreatic/GI malignancy in a first-degree relative and an increased A1c. Prior imaging status is unclear, and an abdominal ultrasound ordered in May 2020 has pending results. The persistence of multiple alarm symptoms warrants further investigation to rule out malignancy.",
+        "attach_documents": [
+          "Recent clinic notes",
+          "Relevant labs (CMP, CBC, A1c)",
+          "Imaging reports (if available)",
+          "Family history documentation"
+        ],
+        "admin_notes": [
+          "Confirm results of abdominal ultrasound ordered May 15, 2020",
+          "Check if CT abdomen/pelvis with pancreatic protocol is needed",
+          "Verify referral contact details"
+        ]
+      },
+      "saved_at": 1771928579.0138721,
+      "last_accessed_at": 1771928579.0138721
+    },
+    "b04f0b81d4ead06de4c6d42fa3371996cd24fb427c4080bd025af711db61fcea": {
+      "meta": {
+        "cache_schema": 1,
+        "task": "referral_letter",
+        "patient": "P0007",
+        "note_hash": "78896c3b7fcc3216ff0c0241ff3659d472976f2dacd2a6826d8b9d0ea32a64fc",
+        "plan_hash": "78ccc35ab60f06a5d72822eae6f6ad831b1e24345cdc1a5d01eeb5dcc14d6b13",
+        "task_params_hash": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+        "task_params": {},
+        "model": "medgemma",
+        "prompt_version": "2026-02-23-v3"
+      },
+      "payload": {
+        "patient_id": "P0007",
+        "target_condition": "pancreatic_cancer",
+        "urgency": "semi-urgent",
+        "recipient": "Gastroenterology or Oncology",
+        "letter_body": "Family Medicine Clinic\nDr. [Your Name]\n[Your Clinic Address]\n[Your Clinic Phone]\n[Your Clinic Fax]\n\nDATE: [Current Date]\n\nTO: Gastroenterology or Oncology\nFAX: [Recipient Fax Number]\n\nRE: Referral for Taylor Chen, DOB: 1958-04-22, OHIP: 7484-234-787\n\nPatient Information:\nName: Taylor Chen\nDOB: 1958-04-22\nOHIP No: 7484-234-787\nAddress: 670 Yonge St, Richmond Hill, ON\nPhone: 905-668-6180\n\nDear Colleague,\n\nReason for Referral:\nI am referring Mr. Taylor Chen for further evaluation of persistent concerning symptoms potentially related to pancreatic cancer. His symptoms have been documented across multiple visits since 2019.\n\nBackground:\nMr. Chen is a 67-year-old male with a history of NAFLD. He presents with multiple alarm symptoms including unintentional weight loss, new-onset diabetes, persistent nausea, intermittent back pain, dark urine, bloating, and dyspepsia. He also has a family history of pancreatic or GI malignancy in a first-degree relative. His A1c has been noted to be increased compared with prior values.\n\nKey Clinical Findings:\n- Unintentional weight loss (documented since 2019)\n- New-onset diabetes (documented May 2020)\n- Persistent nausea (documented since 2019)\n- Intermittent back pain (documented since 2019)\n- Dark urine (documented Feb 2020)\n- Bloating (documented Sep 2019)\n- Dyspepsia (documented May 2020)\n- Pruritus (documented Feb 2019)\n- Increased A1c\n- Family history of pancreatic/GI malignancy (first-degree relative)\n\nInvestigations Completed:\n- CBCs reviewed on multiple occasions; no critical abnormalities documented.\n- CMP planned in Sep 2019, repeat CMP recommended.\n- Abdominal ultrasound requested on May 15, 2020; results are pending and not available in chart.\n\nRelevant History & Medications:\n- PMH: NAFLD\n- Medications: Not available in chart.\n\nRequest:\nGiven the persistence of multiple alarm symptoms, the family history, and the new-onset diabetes, I request your expert evaluation to investigate the possibility of pancreatic malignancy. Please review the results of the pending abdominal ultrasound when available. If the ultrasound is non-diagnostic or unavailable, consideration of CT abdomen/pelvis with pancreatic protocol may be warranted.\n\nThank you for your assistance with this patient.\n\nSincerely,\n\n[Your Name]\n[Your Credentials]",
+        "attachments": [
+          "Recent clinic notes",
+          "Relevant labs (CMP, CBC, A1c)",
+          "Imaging reports (if available)",
+          "Family history documentation"
+        ]
+      },
+      "saved_at": 1771928635.057369,
+      "last_accessed_at": 1771928635.057369
+    },
+    "17e8722905b6b728b4884ae75830e69efe7a590d376514aee4d07e2b4da456b5": {
+      "meta": {
+        "cache_schema": 1,
+        "task": "patient_instructions",
+        "patient": "P0007",
+        "note_hash": "78896c3b7fcc3216ff0c0241ff3659d472976f2dacd2a6826d8b9d0ea32a64fc",
+        "plan_hash": "78ccc35ab60f06a5d72822eae6f6ad831b1e24345cdc1a5d01eeb5dcc14d6b13",
+        "task_params_hash": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+        "task_params": {},
+        "model": "medgemma",
+        "prompt_version": "2026-02-23-v3"
+      },
+      "payload": {
+        "patient_id": "P0007",
+        "target_condition": "pancreatic_cancer",
+        "horizon_months": 24,
+        "instructions": [
+          "Follow up with your doctor to discuss the results of your abdominal ultrasound.",
+          "If you have not had an ultrasound, discuss the need for further imaging like a CT scan with your doctor.",
+          "Keep track of any new or worsening symptoms, such as jaundice (yellowing of skin or eyes), severe abdominal pain, or changes in bowel habits.",
+          "Contact your doctor immediately if you experience any concerning new symptoms or worsening of existing symptoms.",
+          "Attend all scheduled follow-up appointments.",
+          "Continue managing your diabetes as advised by your doctor.",
+          "Discuss any concerns or questions you have about your health with your doctor."
+        ]
+      },
+      "saved_at": 1771928652.2203393,
+      "last_accessed_at": 1771928652.2203393
+    },
+    "40139f0912493aeb65b901c04d6a73868a615062cfe1a5a6930958a438a1f251": {
+      "meta": {
+        "cache_schema": 1,
+        "task": "clinician_summary",
+        "patient": "P0008",
+        "note_hash": "63655b7210233716296c9dc3afe3068c3bd6d464b29bbd55153678616d6c709c",
+        "plan_hash": "78ccc35ab60f06a5d72822eae6f6ad831b1e24345cdc1a5d01eeb5dcc14d6b13",
+        "task_params_hash": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+        "task_params": {},
+        "model": "medgemma",
+        "prompt_version": "2026-02-23-v3"
+      },
+      "payload": {
+        "patient_id": "P0008",
+        "target_condition": "pancreatic_cancer",
+        "horizon_months": 24,
+        "summary_for_chart": "This 48-year-old male presents with multiple persistent symptoms concerning for pancreatic cancer, including epigastric discomfort, pruritus, decreased appetite, unintentional weight loss, early satiety, nausea, and dark urine, documented across multiple visits since 2019. New-onset diabetes was documented in 2019, and A1c has increased since then. Mildly abnormal LFTs have been noted repeatedly. A CT abdomen was discussed on multiple occasions, but its completion status remains unclear in the notes. While no jaundice is explicitly documented, the constellation of symptoms warrants further investigation to rule out malignancy.",
+        "suggested_orders": [
+          "Review prior imaging results, including CT abdomen completion status",
+          "Repeat CMP and LFTs",
+          "Consider CA 19-9 if not previously done"
+        ],
+        "suggested_referrals": [
+          "Referral to Gastroenterology or Oncology for further evaluation"
+        ],
+        "safety_netting": [
+          "Document any new or worsening symptoms, especially jaundice, severe abdominal pain, or significant changes in bowel habits.",
+          "Provide clear return precautions for worsening symptoms.",
+          "Ensure follow-up if imaging or specialist evaluation is not completed promptly."
+        ]
+      },
+      "saved_at": 1771928678.188468,
+      "last_accessed_at": 1771928678.188468
+    },
+    "ca6cc64da6041e0544adb54f2735ae13e575d3ead354acc779f34ea69b4b277e": {
+      "meta": {
+        "cache_schema": 1,
+        "task": "admin_referral",
+        "patient": "P0008",
+        "note_hash": "63655b7210233716296c9dc3afe3068c3bd6d464b29bbd55153678616d6c709c",
+        "plan_hash": "78ccc35ab60f06a5d72822eae6f6ad831b1e24345cdc1a5d01eeb5dcc14d6b13",
+        "task_params_hash": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+        "task_params": {},
+        "model": "medgemma",
+        "prompt_version": "2026-02-23-v3"
+      },
+      "payload": {
+        "patient_id": "P0008",
+        "target_condition": "pancreatic_cancer",
+        "urgency": "semi-urgent",
+        "destination_service": "Oncology or Gastroenterology",
+        "reason_for_referral": "Referral requested for persistent concerning symptoms including epigastric discomfort, pruritus, decreased appetite, unintentional weight loss, early satiety, nausea, dark urine, and intermittent back pain documented across multiple visits since 2019. New-onset diabetes documented in 2019 with increasing A1c and mildly abnormal LFTs are also noted. The constellation of symptoms warrants further investigation to rule out malignancy, given the moderate risk profile.",
+        "attach_documents": [
+          "Recent clinic notes",
+          "Relevant labs (CMP, LFTs, A1c, Ferritin)",
+          "Abdominal ultrasound results (if available)",
+          "CT abdomen results (if available)"
+        ],
+        "admin_notes": [
+          "Confirm completion status of CT abdomen. Ensure specialist receives all relevant prior investigations."
+        ]
+      },
+      "saved_at": 1771928698.8083382,
+      "last_accessed_at": 1771928698.8083382
+    },
+    "b3c42dfb73f0dbf585e4faca8b348b79bd15f8a328e9baea93658377b3ccf43e": {
+      "meta": {
+        "cache_schema": 1,
+        "task": "referral_letter",
+        "patient": "P0008",
+        "note_hash": "63655b7210233716296c9dc3afe3068c3bd6d464b29bbd55153678616d6c709c",
+        "plan_hash": "78ccc35ab60f06a5d72822eae6f6ad831b1e24345cdc1a5d01eeb5dcc14d6b13",
+        "task_params_hash": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+        "task_params": {},
+        "model": "medgemma",
+        "prompt_version": "2026-02-23-v3"
+      },
+      "payload": {
+        "patient_id": "P0008",
+        "target_condition": "pancreatic_cancer",
+        "urgency": "semi-urgent",
+        "recipient": "Oncology or Gastroenterology",
+        "letter_body": "Family Medicine Clinic\nDr. [Your Name]\n[Your Clinic Address]\n[Your Clinic Phone]\n[Your Clinic Fax]\n\nDATE: 2023-10-27\n\nTO: Oncology or Gastroenterology\nFAX: [Specialist Fax Number]\n\nRE: Referral for Avery Smith, DOB: 1977-03-09, OHIP: 6617-308-803\n\nPatient Information:\nName: Avery Smith\nDOB: 1977-03-09\nOHIP: 6617-308-803\nAddress: 659 Woodbine Ave, Richmond Hill, ON\nPhone: 905-470-9280\n\nDear Specialist,\n\nReason for Referral:\nReferral for evaluation of persistent concerning symptoms including epigastric discomfort, pruritus, decreased appetite, unintentional weight loss, early satiety, nausea, dark urine, and intermittent back pain documented across multiple visits since 2019. New-onset diabetes documented in 2019 with increasing A1c and mildly abnormal LFTs are also noted. The constellation of symptoms warrants further investigation to rule out malignancy, given the moderate risk profile.\n\nBackground:\nMr. Smith is a 48-year-old male with a history of hypertension. He presents with multiple persistent symptoms concerning for pancreatic cancer, documented across multiple visits since 2019.\n\nKey Clinical Findings:\nSymptoms include epigastric discomfort, pruritus, decreased appetite, unintentional weight loss, early satiety, nausea, dark urine, and intermittent back pain. New-onset diabetes was documented in 2019, and A1c has increased since then. Mildly abnormal LFTs have been noted repeatedly.\n\nInvestigations Completed:\nRepeat CMP and LFTs ordered on multiple occasions (results available in chart). Ferritin pending at time of visit on multiple occasions (results available in chart). Abdominal ultrasound requested on multiple occasions (results available in chart). A CT abdomen was discussed on multiple occasions, but its completion status remains unclear in the notes.\n\nRelevant History & Medications:\nPMH: Hypertension.\nMedications: Not available in chart.\nAllergies: Not available in chart.\nFamily History: Not available in chart.\nSocial History: Not available in chart.\n\nRequest:\nWe request your expert evaluation of Mr. Smith's persistent symptoms and risk factors. Please review the attached documents and consider further investigation as clinically indicated.\n\nSincerely,\n\n[Your Name]\n[Your Title]",
+        "attachments": [
+          "Recent clinic notes",
+          "Relevant labs (CMP, LFTs, A1c, Ferritin)",
+          "Abdominal ultrasound results (if available)",
+          "CT abdomen results (if available)"
+        ]
+      },
+      "saved_at": 1771928751.2393186,
+      "last_accessed_at": 1771928751.2393186
+    },
+    "0da22ed5acfeee1efafbba148ff375b1e59c733295116b4283f11dfdd4d532f4": {
+      "meta": {
+        "cache_schema": 1,
+        "task": "patient_instructions",
+        "patient": "P0008",
+        "note_hash": "63655b7210233716296c9dc3afe3068c3bd6d464b29bbd55153678616d6c709c",
+        "plan_hash": "78ccc35ab60f06a5d72822eae6f6ad831b1e24345cdc1a5d01eeb5dcc14d6b13",
+        "task_params_hash": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+        "task_params": {},
+        "model": "medgemma",
+        "prompt_version": "2026-02-23-v3"
+      },
+      "payload": {
+        "patient_id": "P0008",
+        "target_condition": "pancreatic_cancer",
+        "horizon_months": 24,
+        "instructions": [
+          "Follow up with your specialist as recommended.",
+          "Keep track of any new or worsening symptoms.",
+          "Contact your doctor if you develop jaundice (yellowing of skin or eyes).",
+          "Contact your doctor if you have severe abdominal pain.",
+          "Contact your doctor if you notice significant changes in your bowel habits.",
+          "Attend all scheduled appointments and tests.",
+          "Discuss any concerns or questions you have with your healthcare team.",
+          "Continue managing your diabetes and hypertension as advised."
+        ]
+      },
+      "saved_at": 1771928767.038047,
+      "last_accessed_at": 1771928767.038047
+    },
+    "44e614f5dedc63e77bb792b8d3178213c910bc7568ff1ea76395ca98f5d3ddef": {
+      "meta": {
+        "cache_schema": 1,
+        "task": "clinician_summary",
+        "patient": "P0009",
+        "note_hash": "6f18a18aee6e55a82ee0f5c85810c42d1f1bb9252bcbedf609612f629f8f129e",
+        "plan_hash": "78ccc35ab60f06a5d72822eae6f6ad831b1e24345cdc1a5d01eeb5dcc14d6b13",
+        "task_params_hash": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+        "task_params": {},
+        "model": "medgemma",
+        "prompt_version": "2026-02-23-v3"
+      },
+      "payload": {
+        "patient_id": "P0009",
+        "target_condition": "pancreatic_cancer",
+        "horizon_months": 24,
+        "summary_for_chart": "This 68-year-old female presents with persistent alarm symptoms including unintentional weight loss, decreased appetite, early satiety, and epigastric discomfort documented across multiple visits since 2019. Other concerning symptoms include pruritus (2019) and dark urine (2020). While lipase has been normal, a CT abdomen ordered in 2019 has unclear completion status, and an abdominal ultrasound requested in 2021 has no documented results. The constellation of symptoms warrants further investigation to rule out serious underlying pathology, including pancreatic cancer, despite normal lipase and lack of documented jaundice. Follow-up is crucial to clarify imaging status and evaluate the persistence of these concerning symptoms.",
+        "suggested_orders": [
+          "Review status and results of CT abdomen ordered in 2019",
+          "Review results of abdominal ultrasound ordered in 2021",
+          "Repeat LFTs if not recently done",
+          "Consider CA 19-9 if imaging is unrevealing and suspicion remains high"
+        ],
+        "suggested_referrals": [
+          "Referral to Gastroenterology or Internal Medicine for further evaluation of persistent alarm symptoms and imaging review"
+        ],
+        "safety_netting": [
+          "Document any new or worsening symptoms, especially jaundice, severe abdominal pain, or significant changes in bowel habits.",
+          "Ensure follow-up occurs if imaging results are not available or if symptoms persist/worsen.",
+          "Provide clear return precautions for worsening symptoms."
+        ]
+      },
+      "saved_at": 1771928798.1658008,
+      "last_accessed_at": 1771928798.1658008
+    },
+    "154b61bf48aa3db4d9e29e40ba0cb5a6e60c82ce346e171df7cd1834d276e90d": {
+      "meta": {
+        "cache_schema": 1,
+        "task": "admin_referral",
+        "patient": "P0009",
+        "note_hash": "6f18a18aee6e55a82ee0f5c85810c42d1f1bb9252bcbedf609612f629f8f129e",
+        "plan_hash": "78ccc35ab60f06a5d72822eae6f6ad831b1e24345cdc1a5d01eeb5dcc14d6b13",
+        "task_params_hash": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+        "task_params": {},
+        "model": "medgemma",
+        "prompt_version": "2026-02-23-v3"
+      },
+      "payload": {
+        "patient_id": "P0009",
+        "target_condition": "pancreatic_cancer",
+        "urgency": "semi-urgent",
+        "destination_service": "Gastroenterology or Internal Medicine",
+        "reason_for_referral": "Referral requested for persistent alarm symptoms including unintentional weight loss, decreased appetite, early satiety, and epigastric discomfort documented across multiple visits since 2019. Other concerning symptoms include pruritus (2019) and dark urine (2020). While lipase has been normal, a CT abdomen ordered in 2019 has unclear completion status, and an abdominal ultrasound requested in 2021 has no documented results. The constellation of symptoms warrants further investigation to rule out serious underlying pathology, including pancreatic cancer, despite normal lipase and lack of documented jaundice.",
+        "attach_documents": [
+          "Recent clinic notes",
+          "Relevant labs/imaging",
+          "List of pending investigations (Ferritin, LFTs)"
+        ],
+        "admin_notes": [
+          "Confirm status and results of CT abdomen ordered in 2019",
+          "Confirm status and results of abdominal ultrasound ordered in 2021",
+          "Verify referral contact details"
+        ]
+      },
+      "saved_at": 1771928825.0100615,
+      "last_accessed_at": 1771928825.0100615
+    },
+    "b0ea959316f2b424d0fc6336fd60e5a8dada64fb456f85188119f63673aea309": {
+      "meta": {
+        "cache_schema": 1,
+        "task": "referral_letter",
+        "patient": "P0009",
+        "note_hash": "6f18a18aee6e55a82ee0f5c85810c42d1f1bb9252bcbedf609612f629f8f129e",
+        "plan_hash": "78ccc35ab60f06a5d72822eae6f6ad831b1e24345cdc1a5d01eeb5dcc14d6b13",
+        "task_params_hash": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+        "task_params": {},
+        "model": "medgemma",
+        "prompt_version": "2026-02-23-v3"
+      },
+      "payload": {
+        "patient_id": "P0009",
+        "target_condition": "pancreatic_cancer",
+        "urgency": "semi-urgent",
+        "recipient": "Gastroenterology or Internal Medicine",
+        "letter_body": "Dr. [Recipient Name/Service],\n\nDATE: 2024-07-26\n\nTO: Gastroenterology or Internal Medicine\n\nFAX: [Fax Number]\n\nRE: Jamie Wong, DOB: 1957-03-26, OHIP: 3938-854-440\n\nPatient Information:\nDOB: 1957-03-26\nOHIP No: 3938-854-440\nAddress: 811 King Rd, Richmond Hill, ON\nPhone: 905-885-5065\n\nDear Dr. [Recipient Name/Service],\n\nReason for Referral:\nReferral for evaluation of persistent alarm symptoms concerning for underlying malignancy, particularly pancreatic cancer, given the constellation of symptoms and lack of definitive imaging.\n\nBackground:\nMs. Wong is a 68-year-old female with a history of hypertension. She has presented with multiple concerning symptoms since 2019, including unintentional weight loss, decreased appetite, early satiety, and epigastric discomfort. Other symptoms noted include pruritus (2019) and dark urine (2020).\n\nKey Clinical Findings:\n- Persistent unintentional weight loss (documented since 2020-07-19)\n- Decreased appetite (documented since 2021-04-04)\n- Early satiety (documented since 2020-11-17)\n- Epigastric discomfort (documented since 2019-04-25)\n- Pruritus (documented 2019-04-25)\n- Dark urine (documented 2020-04-11)\n- Lipase has been consistently within normal limits.\n- No documented jaundice.\n- CBC reviewed on multiple occasions; no critical abnormalities documented.\n\nInvestigations Completed:\n- Lipase: Normal on multiple occasions (2019-04-25, 2020-04-11, 2020-11-17)\n- CBC: Reviewed multiple times, no critical abnormalities documented.\n- LFTs: Mildly abnormal on 2020-07-19, repeat ordered.\n- Ferritin: Pending as of 2021-04-04.\n\nRelevant History & Medications:\n- PMH: Hypertension.\n- Medications: Not available in chart.\n- Family History: Not documented.\n\nImaging Status:\n- CT Abdomen: Ordered in 2019, completion status unclear.\n- Abdominal Ultrasound: Requested in 2021, results not documented in chart.\n\nRequest:\nGiven the persistent alarm symptoms and incomplete imaging workup, I request your expert evaluation to investigate the underlying cause, with a high index of suspicion for pancreatic pathology. Please review the status and results of the prior CT abdomen and abdominal ultrasound. Further investigation and management are warranted.\n\nSincerely,\n\n[Your Name/Clinic Name]",
+        "attachments": [
+          "Recent clinic notes",
+          "Relevant labs/imaging",
+          "List of pending investigations (Ferritin, LFTs)"
+        ]
+      },
+      "saved_at": 1771928888.2727375,
+      "last_accessed_at": 1771928888.2727375
+    },
+    "a00fac883995110cbcd2ca538ba02cd7d61a20b035838806c6c8e88426f03f78": {
+      "meta": {
+        "cache_schema": 1,
+        "task": "patient_instructions",
+        "patient": "P0009",
+        "note_hash": "6f18a18aee6e55a82ee0f5c85810c42d1f1bb9252bcbedf609612f629f8f129e",
+        "plan_hash": "78ccc35ab60f06a5d72822eae6f6ad831b1e24345cdc1a5d01eeb5dcc14d6b13",
+        "task_params_hash": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+        "task_params": {},
+        "model": "medgemma",
+        "prompt_version": "2026-02-23-v3"
+      },
+      "payload": {
+        "patient_id": "P0009",
+        "target_condition": "pancreatic_cancer",
+        "horizon_months": 24,
+        "instructions": [
+          "Follow up with the specialist referred to you (Gastroenterology or Internal Medicine) for evaluation of your symptoms.",
+          "If you have not already, please provide the specialist with results from any tests or imaging you have had.",
+          "Contact your doctor if you develop new or worsening symptoms, such as jaundice (yellowing of skin or eyes), severe abdominal pain, or significant changes in bowel habits.",
+          "Keep track of your symptoms, including weight changes, appetite, and any discomfort.",
+          "Attend all scheduled follow-up appointments.",
+          "Ensure the specialist has the results of the abdominal ultrasound ordered in 2021.",
+          "Ensure the specialist has information about the CT abdomen ordered in 2019."
+        ]
+      },
+      "saved_at": 1771928911.518472,
+      "last_accessed_at": 1771928911.518472
+    },
+    "f1acca3fb57538f85602e251732e908f8e9b0b0624a6b660cc7a138f61022f75": {
+      "meta": {
+        "cache_schema": 1,
+        "task": "clinician_summary",
+        "patient": "P0010",
+        "note_hash": "443dc326465a57a09b28e7e7867aa7fe6b42ddbff1c6da0903ebd2a35b2e8f2f",
+        "plan_hash": "78ccc35ab60f06a5d72822eae6f6ad831b1e24345cdc1a5d01eeb5dcc14d6b13",
+        "task_params_hash": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+        "task_params": {},
+        "model": "medgemma",
+        "prompt_version": "2026-02-23-v3"
+      },
+      "payload": {
+        "patient_id": "P0010",
+        "target_condition": "pancreatic_cancer",
+        "horizon_months": 24,
+        "summary_for_chart": "This 59-year-old male presents with multiple persistent symptoms concerning for pancreatic cancer, including new-onset diabetes (2020-04-03), progressive weight loss indicators (decreased appetite 2019-11-26, early satiety 2019-07-10, 2020-07-08, 2021-03-21), persistent pruritus (2019-07-10, 2020-07-08, 2021-03-21, 2021-07-21), and epigastric discomfort/dyspepsia (2019-07-10, 2020-11-29). Intermittent back pain (2020-04-03) and increasing A1c (2020-07-08, 2020-11-29) are also noted. The status of previously discussed imaging (CT abdomen 2020-11-29, 2021-07-21) is unclear, limiting definitive assessment. Given the constellation of symptoms and lack of completed workup, follow-up is crucial to clarify imaging status and determine the need for further investigation.",
+        "suggested_orders": [
+          "Review prior imaging results (CT abdomen discussed 2020-11-29, 2021-07-21)",
+          "Order abdominal imaging (e.g., CT or MRI) if prior imaging is unavailable or inconclusive",
+          "Repeat CMP and A1c"
+        ],
+        "suggested_referrals": [
+          "Consider referral to Gastroenterology or Oncology if imaging is concerning or symptoms persist"
+        ],
+        "safety_netting": [
+          "Document any new or worsening symptoms, especially jaundice, severe abdominal pain, or significant weight loss.",
+          "Ensure follow-up if imaging is not completed or if symptoms persist/worsen.",
+          "Provide patient education on red-flag symptoms requiring urgent attention."
+        ]
+      },
+      "saved_at": 1771928962.2097175,
+      "last_accessed_at": 1771928962.2097175
+    },
+    "832dd25c0babcc445b1559ec88ba7dd78807f7eda1197a0bae08fcefbb49099e": {
+      "meta": {
+        "cache_schema": 1,
+        "task": "admin_referral",
+        "patient": "P0010",
+        "note_hash": "443dc326465a57a09b28e7e7867aa7fe6b42ddbff1c6da0903ebd2a35b2e8f2f",
+        "plan_hash": "78ccc35ab60f06a5d72822eae6f6ad831b1e24345cdc1a5d01eeb5dcc14d6b13",
+        "task_params_hash": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+        "task_params": {},
+        "model": "medgemma",
+        "prompt_version": "2026-02-23-v3"
+      },
+      "payload": {
+        "patient_id": "P0010",
+        "target_condition": "pancreatic_cancer",
+        "urgency": "semi-urgent",
+        "destination_service": "Oncology",
+        "reason_for_referral": "Referral requested due to multiple persistent symptoms concerning for pancreatic cancer, including new-onset diabetes (2020-04-03), progressive weight loss indicators (decreased appetite 2019-11-26, early satiety 2019-07-10, 2020-07-08, 2021-03-21), persistent pruritus (2019-07-10, 2020-07-08, 2021-03-21, 2021-07-21), and epigastric discomfort/dyspepsia (2019-07-10, 2020-11-29). Intermittent back pain (2020-04-03) and increasing A1c (2020-07-08, 2020-11-29) are also noted. The status of previously discussed imaging (CT abdomen 2020-11-29, 2021-07-21) is unclear, warranting further investigation.",
+        "attach_documents": [
+          "Recent clinic notes",
+          "Relevant labs/imaging (if available)",
+          "List of medications"
+        ],
+        "admin_notes": [
+          "Confirm status of CT abdomen discussed 2020-11-29 and 2021-07-21",
+          "Verify patient contact information"
+        ]
+      },
+      "saved_at": 1771929002.4026413,
+      "last_accessed_at": 1771929002.4026413
+    },
+    "173c65318ede9db5a110708186c8fdb918343c934858e382b37b23cf8485b705": {
+      "meta": {
+        "cache_schema": 1,
+        "task": "referral_letter",
+        "patient": "P0010",
+        "note_hash": "443dc326465a57a09b28e7e7867aa7fe6b42ddbff1c6da0903ebd2a35b2e8f2f",
+        "plan_hash": "78ccc35ab60f06a5d72822eae6f6ad831b1e24345cdc1a5d01eeb5dcc14d6b13",
+        "task_params_hash": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+        "task_params": {},
+        "model": "medgemma",
+        "prompt_version": "2026-02-23-v3"
+      },
+      "payload": {
+        "patient_id": "P0010",
+        "target_condition": "pancreatic_cancer",
+        "urgency": "semi-urgent",
+        "recipient": "Oncology",
+        "letter_body": "Clinic Name\nDATE: 2024-07-26\n\nTO: Oncology Department\nFAX: [Insert Fax Number]\n\nRE: Referral for Alex Garcia, DOB: 1966-10-07, OHIP: 1027-632-925\n\nPatient Information:\nDOB: 1966-10-07\nOHIP No: 1027-632-925\nAddress: 561 Leslie St, Richmond Hill, ON\nPhone: 905-936-4228\n\nDear Colleague,\n\nReason for Referral:\nI am referring Mr. Alex Garcia, a 59-year-old male, for evaluation concerning potential pancreatic cancer, given a constellation of persistent symptoms and risk factors.\n\nBackground:\nMr. Garcia has presented with multiple concerning symptoms over the past several years, including new-onset diabetes (diagnosed 2020-04-03), progressive weight loss indicators (decreased appetite noted 2019-11-26, early satiety noted 2019-07-10, 2020-07-08, 2021-03-21), persistent pruritus (noted 2019-07-10, 2020-07-08, 2021-03-21, 2021-07-21), and epigastric discomfort/dyspepsia (noted 2019-07-10, 2020-11-29). Intermittent back pain was noted in 2020-04-03, and his A1c has been increasing (noted 2020-07-08, 2020-11-29).\n\nKey Clinical Findings:\n- New-onset diabetes mellitus (2020-04-03)\n- Progressive weight loss indicators: decreased appetite, early satiety\n- Persistent pruritus\n- Epigastric discomfort/dyspepsia\n- Intermittent back pain\n- Increasing A1c\n\nInvestigations Completed:\n- Lipase was within normal range on 2020-04-03.\n- CMPs have been monitored, with increasing A1c noted.\n- Status of previously discussed CT abdomen (2020-11-29, 2021-07-21) is unclear.\n\nRelevant History & Medications:\n- PMH: Hyperlipidemia. No other major chronic diseases documented.\n- Medications: List of medications attached.\n\nRequest:\nGiven the concerning symptoms and unclear imaging status, I would appreciate your expert evaluation of Mr. Garcia to investigate the possibility of pancreatic cancer and determine the need for further workup or management.\n\nSincerely,\n\n[Your Name/Clinic Name]",
+        "attachments": [
+          "Recent clinic notes",
+          "Relevant labs/imaging (if available)",
+          "List of medications"
+        ]
+      },
+      "saved_at": 1771929074.894506,
+      "last_accessed_at": 1771929074.894506
+    },
+    "dfdc1ea4ed84ecb324ce227b7050606363831412daf39aa6c86928f34aa6b4ec": {
+      "meta": {
+        "cache_schema": 1,
+        "task": "patient_instructions",
+        "patient": "P0010",
+        "note_hash": "443dc326465a57a09b28e7e7867aa7fe6b42ddbff1c6da0903ebd2a35b2e8f2f",
+        "plan_hash": "78ccc35ab60f06a5d72822eae6f6ad831b1e24345cdc1a5d01eeb5dcc14d6b13",
+        "task_params_hash": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+        "task_params": {},
+        "model": "medgemma",
+        "prompt_version": "2026-02-23-v3"
+      },
+      "payload": {
+        "patient_id": "P0010",
+        "target_condition": "pancreatic_cancer",
+        "horizon_months": 24,
+        "instructions": [
+          "Please follow up with your doctor to discuss the status of your abdominal imaging (CT scan discussed in late 2020 and mid-2021).",
+          "If you haven't had recent imaging, your doctor may order a new scan.",
+          "Keep track of any new or worsening symptoms, such as jaundice (yellowing of skin/eyes), severe abdominal pain, or significant weight loss.",
+          "Contact your doctor if you experience any concerning new symptoms or if your current symptoms get worse.",
+          "Continue to monitor your blood sugar as advised by your doctor, especially with your new-onset diabetes.",
+          "Attend all scheduled follow-up appointments to discuss your symptoms and any test results.",
+          "If you have questions or concerns about your health, please reach out to your healthcare team."
+        ]
+      },
+      "saved_at": 1771929099.894057,
+      "last_accessed_at": 1771929099.894057
+    },
+    "6ae39ff67dd03fb9830d40854656e82d7bfee2c0a1d4b1749dd56fa1adf35ebd": {
+      "meta": {
+        "cache_schema": 1,
+        "task": "followup_gap_detection",
+        "patient": "P0007",
+        "note_hash": "78896c3b7fcc3216ff0c0241ff3659d472976f2dacd2a6826d8b9d0ea32a64fc",
+        "plan_hash": "78ccc35ab60f06a5d72822eae6f6ad831b1e24345cdc1a5d01eeb5dcc14d6b13",
+        "task_params_hash": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+        "task_params": {},
+        "model": "medgemma",
+        "prompt_version": "2026-02-23-v3"
+      },
+      "payload": {
+        "patient_id": "P0007",
+        "pending_items": [
+          "Review results of abdominal ultrasound ordered May 15, 2020",
+          "Review results of CMP planned in 4 weeks (from 2019-09-22)"
+        ],
+        "missed_followup_signals": [
+          "Unintentional weight loss documented across visits",
+          "New-onset diabetes documented",
+          "Persistent nausea documented across visits",
+          "Intermittent back pain documented across visits",
+          "Dark urine documented",
+          "Bloating documented",
+          "Dyspepsia documented",
+          "Pruritus documented",
+          "Increased A1c compared with prior",
+          "Family history of pancreatic or GI malignancy documented in a first-degree relative",
+          "CT abdomen discussed; completion status unclear (2019-02-18)",
+          "No recent imaging available in chart (multiple visits)"
+        ],
+        "suggested_actions": [
+          "Follow up on results of abdominal ultrasound ordered May 15, 2020",
+          "Follow up on results of CMP planned in 4 weeks (from 2019-09-22)",
+          "If ultrasound is non-diagnostic or unavailable, consider CT abdomen/pelvis with pancreatic protocol",
+          "Assess patient for worsening symptoms, particularly jaundice or severe abdominal pain",
+          "Review timing and findings of prior abdominal imaging"
+        ],
+        "gap_severity": "high"
+      },
+      "saved_at": 1771929465.5873933,
+      "last_accessed_at": 1771929465.5873933
+    }
+  }
+}
