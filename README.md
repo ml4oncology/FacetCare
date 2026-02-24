@@ -3,7 +3,7 @@
 FacetCare is a clinician-centered, agentic triage platform that adapts to the clinic, instead of forcing the clinic to adapt to the software. The physician starts with plain language, for example, "Review the top 5 patients at risk of colorectal cancer every week and prepare summaries and referral drafts." FacetCare converts that request into a validated clinic plan, runs the plan over longitudinal patient notes, and returns a concise review bundle for physician approval.
 
 <p align="center">
-  <img src="assets/logo.png" alt="FacetCare logo" width="200"/>
+  <img src="assets/logo.png" alt="FacetCare logo" width="1000"/>
 </p>
 
 ## What is this
@@ -53,7 +53,6 @@ python web_app.py --endpoint <url> --model <model_name>
 | `--host` | `127.0.0.1` | Host to bind the Flask app to |
 | `--port` | `5000` | Port to bind the Flask app to |
 
-All arguments can also be set via environment variables: `FACETCARE_ENDPOINT`, `FACETCARE_MODEL`, `FACETCARE_HOST`, `FACETCARE_PORT`.
 
 **Example — local network server, accessible to a colleague:**
 
