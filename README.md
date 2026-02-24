@@ -7,9 +7,9 @@ FacetCare is a clinician-centered, agentic triage platform that adapts to the cl
 </p>
 
 ## What is this
-- A Plan Builder converts a clinic's natural-language workflow description into a validated Clinic Plan (JSON).
-- A deterministic Runner executes that plan repeatedly:
-  - scores patients (LLM task)
+- A Plan Builder converts a clinic's natural-language workflow description into a validated Clinic Plan (JSON) with MedGemma.
+- A deterministic Runner executes that plan repeatedly using MedGemma as agents:
+  - scores patients
   - selects top-K or thresholded top-K
   - enforces a dedup window
   - generates clinic-ready artifacts for selected patients only
