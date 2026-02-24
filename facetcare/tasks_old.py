@@ -1,8 +1,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-import datetime as dt
-import re
 from typing import Any, Dict, List, Optional
 
 from .llm_client import LLMJsonClient
@@ -67,206 +65,6 @@ def _get_summary(state: Dict[str, Any], patient_id: str) -> Optional[ClinicianSu
     return s if isinstance(s, ClinicianSummarySchema) else None
 
 
-def _get_followup_gap(state: Dict[str, Any], patient_id: str) -> Optional[FollowupGapSchema]:
-    fbp = state.get("followup_gap_by_patient") or {}
-    f = fbp.get(patient_id)
-    return f if isinstance(f, FollowupGapSchema) else None
-
-
-def _get_guideline(state: Dict[str, Any], patient_id: str) -> Optional[GuidelineComparisonSchema]:
-    gbp = state.get("guideline_comparison_by_patient") or {}
-    g = gbp.get(patient_id)
-    return g if isinstance(g, GuidelineComparisonSchema) else None
-
-
-def _get_admin_referral(state: Dict[str, Any], patient_id: str) -> Optional[AdminReferralSchema]:
-    abp = state.get("admin_referral_by_patient") or {}
-    a = abp.get(patient_id)
-    return a if isinstance(a, AdminReferralSchema) else None
-
-
-def _patient_demographics(patient: PatientRecord) -> Dict[str, str]:
-    out: Dict[str, str] = {}
-    for key in ["patient_name", "date_of_birth", "sex", "ohip_number", "address", "phone"]:
-        val = getattr(patient, key, None)
-        if isinstance(val, str) and val.strip():
-            out[key] = val.strip()
-    return out
-
-
-def _patient_notes_for_prompt(patient: PatientRecord) -> str:
-    base_notes = str(getattr(patient, "longitudinal_notes", "") or "").strip()
-    demo = _patient_demographics(patient)
-    if not demo:
-        return base_notes
-    lines: List[str] = ["PATIENT HEADER (chart metadata):"]
-    label_map = {
-        "patient_name": "Patient name",
-        "date_of_birth": "DOB",
-        "sex": "Sex",
-        "ohip_number": "OHIP",
-        "address": "Address",
-        "phone": "Phone",
-    }
-    for key in ["patient_name", "date_of_birth", "sex", "ohip_number", "address", "phone"]:
-        if key in demo:
-            lines.append(f"- {label_map[key]}: {demo[key]}")
-    if getattr(patient, "longitudinal_note_entries", None):
-        lines.append(f"- Longitudinal note count: {len(patient.longitudinal_note_entries)}")
-    if base_notes:
-        lines.extend(["", "LONGITUDINAL CLINIC NOTES:", base_notes])
-    return "\n".join(lines).strip()
-
-
-def _estimate_age_from_dob(dob_text: Optional[str]) -> Optional[int]:
-    if not dob_text or not isinstance(dob_text, str):
-        return None
-    s = dob_text.strip()
-    for fmt in ("%Y-%m-%d", "%Y/%m/%d"):
-        try:
-            dob = dt.datetime.strptime(s, fmt).date()
-            today = dt.date.today()
-            return today.year - dob.year - ((today.month, today.day) < (dob.month, dob.day))
-        except Exception:
-            continue
-    return None
-
-
-def _clean_line(text: Any) -> str:
-    return re.sub(r"\s+", " ", str(text or "")).strip()
-
-
-def _format_referral_letter_text(
-    *,
-    patient: PatientRecord,
-    plan: ClinicPlanSchema,
-    target: str,
-    recipient: str,
-    urgency: str,
-    llm_body: str,
-    referral: Optional[AdminReferralSchema],
-    risk: Optional[RiskAssessmentSchema],
-    summ: Optional[ClinicianSummarySchema],
-) -> str:
-    demo = _patient_demographics(patient)
-    patient_name = demo.get("patient_name") or patient.patient_id
-    dob = demo.get("date_of_birth") or "Not available in chart"
-    ohip = demo.get("ohip_number") or "Not available in chart"
-    addr = demo.get("address") or "Not available in chart"
-    phone = demo.get("phone") or "Not available in chart"
-    age = _estimate_age_from_dob(demo.get("date_of_birth"))
-    sex = demo.get("sex") or "Not available in chart"
-
-    clinic_name = ""
-    try:
-        wf = getattr(plan, "workflow", None)
-        clinic_name = _clean_line(getattr(wf, "clinic_name", "")) if wf is not None else ""
-    except Exception:
-        clinic_name = ""
-    if not clinic_name:
-        clinic_name = "FacetCare Demo Clinic"
-
-    referral_reason = ""
-    request_line = ""
-    if isinstance(referral, AdminReferralSchema):
-        referral_reason = _clean_line(getattr(referral, "reason", "") or "")
-        request_line = _clean_line(getattr(referral, "request_to_specialist", "") or "")
-    if not referral_reason:
-        referral_reason = f"Assessment and management of concerns related to {target.replace('_', ' ')}"
-    if not request_line:
-        request_line = "I would appreciate your assessment and recommendations for next steps."
-
-    key_bullets: List[str] = []
-    if risk is not None:
-        try:
-            key_bullets.append(f"Risk score {float(risk.risk_score):.2f} ({risk.risk_level})")
-        except Exception:
-            pass
-        for x in list(getattr(risk, "reasons", []) or [])[:3]:
-            x = _clean_line(x)
-            if x:
-                key_bullets.append(x)
-    if summ is not None:
-        for x in list(getattr(summ, "key_points", []) or [])[:4]:
-            x = _clean_line(x)
-            if x:
-                key_bullets.append(x)
-    if isinstance(referral, AdminReferralSchema):
-        for x in list(getattr(referral, "required_pre_referral_steps", []) or [])[:3]:
-            x = _clean_line(x)
-            if x:
-                key_bullets.append(x)
-    deduped: List[str] = []
-    seen: set[str] = set()
-    for x in key_bullets:
-        k = x.lower()
-        if k in seen:
-            continue
-        seen.add(k)
-        deduped.append(x)
-    key_bullets = deduped[:6] if deduped else ["Please see attached longitudinal clinic notes for the most relevant findings."]
-
-    investigations_lines: List[str] = []
-    for ln in str(getattr(patient, "longitudinal_notes", "") or "").splitlines():
-        s = _clean_line(ln)
-        low = s.lower()
-        if any(tok in low for tok in ["ct", "mri", "ultrasound", "lab", "cbc", "lft", "a1c", "ferritin", "lipase", "amylase", "cmp"]):
-            investigations_lines.append(s)
-        if len(investigations_lines) >= 4:
-            break
-    if not investigations_lines:
-        investigations_lines = ["Relevant investigations are described in the chart notes; exact values may be incomplete in free-text documentation."]
-
-    history_line = "Relevant history and medications should be confirmed in the EMR medication/problem list."
-    meds = list(getattr(summ, "medications_to_review", []) or []) if summ is not None else []
-    meds = [_clean_line(m) for m in meds if _clean_line(m)]
-    if meds:
-        history_line = "Medications to review: " + "; ".join(meds[:5])
-
-    llm_body_clean = str(llm_body or "").strip()
-    has_structured_header = any(tag in llm_body_clean.upper() for tag in ["DATE:", "RE:", "REASON FOR REFERRAL:"])
-
-    if has_structured_header:
-        return llm_body_clean
-
-    today_str = dt.date.today().isoformat()
-    lines: List[str] = [
-        clinic_name,
-        "[Address / Phone / Fax]",
-        "",
-        f"DATE: {today_str}",
-        f"TO: Dr. {recipient}",
-        "FAX: Not available in chart",
-        f"RE: {patient_name}",
-        f"DOB: {dob}",
-        f"OHIP No: {ohip}",
-        f"Address: {addr}",
-        f"Phone: {phone}",
-        "",
-        f"Dear Dr. {recipient},",
-        "",
-        f"Reason for Referral: {referral_reason}.",
-    ]
-    if age is not None:
-        if sex != "Not available in chart":
-            lines.append(f"Background: {patient_name} is a {age}-year-old patient ({sex}) followed in family medicine.")
-        else:
-            lines.append(f"Background: {patient_name} is a {age}-year-old patient followed in family medicine.")
-    else:
-        lines.append(f"Background: {patient_name} is a patient followed in family medicine.")
-    lines.extend(["", "Key Clinical Findings:"])
-    for b in key_bullets:
-        lines.append(f"- {b}")
-    lines.extend(["", "Investigations Completed:"])
-    for inv in investigations_lines:
-        lines.append(f"- {inv}")
-    lines.extend(["", "Relevant History & Medications:", f"- {history_line}", "- Allergies: Not available in chart", "", f"Request: {request_line}"])
-    if llm_body_clean:
-        lines.extend(["", "Additional Clinical Context:", llm_body_clean])
-    lines.extend(["", "Sincerely,", "[Referring Clinician Name]", "[Billing Number]"])
-    return "\n".join(lines).strip()
-
-
 class IntakeWorkflowTask(TaskBase):
     name = "intake_workflow"
 
@@ -314,7 +112,7 @@ class RiskAssessmentTask(TaskBase):
             patient_id=patient.patient_id,
             target=target,
             horizon=horizon,
-            notes=_patient_notes_for_prompt(patient),
+            notes=patient.longitudinal_notes,
         )
         obj = ctx.llm.json_object_no_tools(system=system, user=user, temperature=0.0)
         rp = coerce_probability(obj.get("risk_probability"), default=0.01)
@@ -330,20 +128,14 @@ class QueuePrioritizationTask(TaskBase):
 
     def run(self, *, ctx: TaskContext, plan: ClinicPlanSchema, patient: PatientRecord, state: Dict[str, Any], task_params: Optional[Dict[str, Any]] = None) -> QueuePrioritizationSchema:
         workflow = state.get("workflow")
-        risk = _get_risk(state, patient.patient_id)
-        summ = _get_summary(state, patient.patient_id)
-        gap = _get_followup_gap(state, patient.patient_id)
         target, horizon = _plan_target_and_horizon(plan, task_params)
         system, user = prompts.queue_prioritization_prompt(
             clinic_goals=plan.clinic_description,
             workflow_json=workflow.model_dump_json(indent=2) if workflow else "{}",
             patient_id=patient.patient_id,
-            notes=_patient_notes_for_prompt(patient),
+            notes=patient.longitudinal_notes,
             target=target,
             horizon=horizon,
-            risk_json=risk.model_dump_json(indent=2) if risk else "none",
-            summary_json=summ.model_dump_json(indent=2) if summ else "none",
-            followup_gap_json=gap.model_dump_json(indent=2) if gap else "none",
         )
         obj = ctx.llm.json_object_no_tools(system=system, user=user, temperature=0.0)
         score = coerce_probability(obj.get("priority_score"), default=0.25)
@@ -374,7 +166,7 @@ class ClinicianSummaryTask(TaskBase):
             target=target,
             horizon=horizon,
             risk_json=risk.model_dump_json(indent=2) if risk else "not provided",
-            notes=_patient_notes_for_prompt(patient),
+            notes=patient.longitudinal_notes,
         )
         obj = ctx.llm.json_object_no_tools(system=system, user=user, temperature=0.0)
         payload = normalize_clinician_summary_payload(obj, patient_id=patient.patient_id, target_condition=target, horizon_months=horizon)
@@ -389,7 +181,6 @@ class AdminReferralTask(TaskBase):
     def run(self, *, ctx: TaskContext, plan: ClinicPlanSchema, patient: PatientRecord, state: Dict[str, Any], task_params: Optional[Dict[str, Any]] = None) -> AdminReferralSchema:
         risk = _get_risk(state, patient.patient_id)
         summ = _get_summary(state, patient.patient_id)
-        guideline = _get_guideline(state, patient.patient_id)
         target, _ = _plan_target_and_horizon(plan, task_params)
         if risk is not None:
             target = risk.target_condition
@@ -412,8 +203,7 @@ class AdminReferralTask(TaskBase):
             destination=dest,
             risk_json=risk.model_dump_json(indent=2) if risk else "none",
             summary_json=summ.model_dump_json(indent=2) if summ else "none",
-            guideline_json=guideline.model_dump_json(indent=2) if guideline else "none",
-            notes=_patient_notes_for_prompt(patient),
+            notes=patient.longitudinal_notes,
         )
         obj = ctx.llm.json_object_no_tools(system=system, user=user, temperature=0.0)
         out = AdminReferralSchema(
@@ -435,8 +225,6 @@ class PatientInstructionsTask(TaskBase):
     def run(self, *, ctx: TaskContext, plan: ClinicPlanSchema, patient: PatientRecord, state: Dict[str, Any], task_params: Optional[Dict[str, Any]] = None) -> PatientInstructionsSchema:
         risk = _get_risk(state, patient.patient_id)
         summ = _get_summary(state, patient.patient_id)
-        gap = _get_followup_gap(state, patient.patient_id)
-        admin_ref = _get_admin_referral(state, patient.patient_id)
         target, horizon = _plan_target_and_horizon(plan, task_params)
         if risk:
             target, horizon = risk.target_condition, risk.horizon_months
@@ -446,18 +234,14 @@ class PatientInstructionsTask(TaskBase):
             horizon=horizon,
             summary_json=summ.model_dump_json(indent=2) if summ else "none",
             risk_json=risk.model_dump_json(indent=2) if risk else "none",
-            followup_gap_json=gap.model_dump_json(indent=2) if gap else "none",
-            admin_referral_json=admin_ref.model_dump_json(indent=2) if admin_ref else "none",
-            notes=_patient_notes_for_prompt(patient),
+            notes=patient.longitudinal_notes,
         )
         obj = ctx.llm.json_object_no_tools(system=system, user=user, temperature=0.0)
         instructions = ensure_list_str(obj.get("instructions")) or [
             "Follow the clinic's recommended follow-up timeline.",
             "Seek urgent care if red-flag symptoms occur or worsen.",
         ]
-        out = PatientInstructionsSchema(patient_id=patient.patient_id, target_condition=target, horizon_months=horizon, instructions=instructions)
-        state.setdefault("patient_instructions_by_patient", {})[patient.patient_id] = out
-        return out
+        return PatientInstructionsSchema(patient_id=patient.patient_id, target_condition=target, horizon_months=horizon, instructions=instructions)
 
 
 class ResultsSummaryTask(TaskBase):
@@ -469,7 +253,7 @@ class ResultsSummaryTask(TaskBase):
             patient_id=patient.patient_id,
             target=target,
             horizon=horizon,
-            notes=_patient_notes_for_prompt(patient),
+            notes=patient.longitudinal_notes,
         )
         obj = ctx.llm.json_object_no_tools(system=system, user=user, temperature=0.0)
         return ResultsSummarySchema(
@@ -501,21 +285,10 @@ class ReferralLetterTask(TaskBase):
             referral_json=referral.model_dump_json(indent=2) if isinstance(referral, AdminReferralSchema) else "none",
             risk_json=risk.model_dump_json(indent=2) if risk else "none",
             summary_json=summ.model_dump_json(indent=2) if summ else "none",
-            notes=_patient_notes_for_prompt(patient),
+            notes=patient.longitudinal_notes,
         )
         obj = ctx.llm.json_object_no_tools(system=system, user=user, temperature=0.0)
-        raw_body = first_non_empty(obj.get("letter_body"), default=f"Referral request for {patient.patient_id} for further assessment.")
-        body = _format_referral_letter_text(
-            patient=patient,
-            plan=plan,
-            target=target,
-            recipient=recipient,
-            urgency=urgency,
-            llm_body=raw_body,
-            referral=referral if isinstance(referral, AdminReferralSchema) else None,
-            risk=risk,
-            summ=summ,
-        )
+        body = first_non_empty(obj.get("letter_body"), default=f"Referral request for {patient.patient_id} for further assessment.")
         return ReferralLetterSchema(
             patient_id=patient.patient_id,
             target_condition=first_non_empty(obj.get("target_condition"), default=target),
@@ -537,7 +310,7 @@ class DifferentialDiagnosisTask(TaskBase):
             target=target,
             horizon=horizon,
             summary_json=summ.model_dump_json(indent=2) if summ else "none",
-            notes=_patient_notes_for_prompt(patient),
+            notes=patient.longitudinal_notes,
         )
         obj = ctx.llm.json_object_no_tools(system=system, user=user, temperature=0.0)
         return DifferentialDiagnosisSchema(
@@ -554,40 +327,30 @@ class GuidelineComparisonTask(TaskBase):
 
     def run(self, *, ctx: TaskContext, plan: ClinicPlanSchema, patient: PatientRecord, state: Dict[str, Any], task_params: Optional[Dict[str, Any]] = None) -> GuidelineComparisonSchema:
         target, horizon = _plan_target_and_horizon(plan, task_params)
-        risk = _get_risk(state, patient.patient_id)
-        summ = _get_summary(state, patient.patient_id)
         system, user = prompts.guideline_comparison_prompt(
             patient_id=patient.patient_id,
             target=target,
             horizon=horizon,
-            notes=_patient_notes_for_prompt(patient),
-            risk_json=risk.model_dump_json(indent=2) if risk else "none",
-            summary_json=summ.model_dump_json(indent=2) if summ else "none",
+            notes=patient.longitudinal_notes,
         )
         obj = ctx.llm.json_object_no_tools(system=system, user=user, temperature=0.0)
-        out = GuidelineComparisonSchema(
+        return GuidelineComparisonSchema(
             patient_id=patient.patient_id,
             target_condition=target,
             horizon_months=horizon,
             recommended_guidelines=ensure_list_str(obj.get("recommended_guidelines") or ["Use local clinic and specialty pathway guidelines"]),
             evidence_summary=first_non_empty(obj.get("evidence_summary"), default="Guideline mapping requires clinician confirmation."),
         )
-        state.setdefault("guideline_comparison_by_patient", {})[patient.patient_id] = out
-        return out
 
 
 class FollowupGapDetectionTask(TaskBase):
     name = "followup_gap_detection"
 
     def run(self, *, ctx: TaskContext, plan: ClinicPlanSchema, patient: PatientRecord, state: Dict[str, Any], task_params: Optional[Dict[str, Any]] = None) -> FollowupGapSchema:
-        summ = _get_summary(state, patient.patient_id)
-        risk = _get_risk(state, patient.patient_id)
         system, user = prompts.followup_gap_prompt(
             clinic_goals=plan.clinic_description,
             patient_id=patient.patient_id,
-            notes=_patient_notes_for_prompt(patient),
-            summary_json=summ.model_dump_json(indent=2) if summ else "none",
-            risk_json=risk.model_dump_json(indent=2) if risk else "none",
+            notes=patient.longitudinal_notes,
         )
         obj = ctx.llm.json_object_no_tools(system=system, user=user, temperature=0.0)
         sev = first_non_empty(obj.get("gap_severity"), default="moderate")
@@ -611,13 +374,10 @@ class ReferralIntakeChecklistTask(TaskBase):
         workflow = state.get("workflow")
         default_dest = workflow.referral_pathway.external if isinstance(workflow, ClinicWorkflowSchema) else "Specialty clinic"
         dest = first_non_empty((task_params or {}).get("destination_service"), default=default_dest)
-        admin_ref = state.get("admin_referral_by_patient", {}).get(patient.patient_id)
         system, user = prompts.referral_intake_checklist_prompt(
             destination=dest,
             patient_id=patient.patient_id,
-            notes=_patient_notes_for_prompt(patient),
-            admin_referral_json=admin_ref.model_dump_json(indent=2) if isinstance(admin_ref, AdminReferralSchema) else "none",
-            workflow_json=workflow.model_dump_json(indent=2) if isinstance(workflow, ClinicWorkflowSchema) else "none",
+            notes=patient.longitudinal_notes,
         )
         obj = ctx.llm.json_object_no_tools(system=system, user=user, temperature=0.0)
         triage = first_non_empty(obj.get("triage_bucket"), default="routine")
@@ -643,7 +403,7 @@ class LabTrendSummaryTask(TaskBase):
         system, user = prompts.lab_trend_prompt(
             timeframe=timeframe,
             patient_id=patient.patient_id,
-            notes=_patient_notes_for_prompt(patient),
+            notes=patient.longitudinal_notes,
         )
         obj = ctx.llm.json_object_no_tools(system=system, user=user, temperature=0.0)
         out = LabTrendSummarySchema(
@@ -665,7 +425,7 @@ class CarePlanReconciliationTask(TaskBase):
         system, user = prompts.care_plan_reconciliation_prompt(
             clinic_goals=plan.clinic_description,
             patient_id=patient.patient_id,
-            notes=_patient_notes_for_prompt(patient),
+            notes=patient.longitudinal_notes,
         )
         obj = ctx.llm.json_object_no_tools(system=system, user=user, temperature=0.0)
         out = CarePlanReconciliationSchema(
