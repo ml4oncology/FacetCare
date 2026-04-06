@@ -401,10 +401,18 @@ class IntakeWorkflowTask(TaskBase):
         return workflow
 
 
-class RiskAssessmentTask(TaskBase):
+class RiskAssessmentTask(AgentBackedTask["RiskAssessmentTaskInput", RiskAssessmentSchema]):
     name = "risk_assessment"
+    output_model = RiskAssessmentSchema
 
-    def run(self, *, ctx: TaskContext, plan: ClinicPlanSchema, patient: PatientRecord, state: Dict[str, Any], task_params: Optional[Dict[str, Any]] = None) -> RiskAssessmentSchema:
+    def build_input(
+        self,
+        *,
+        plan: ClinicPlanSchema,
+        patient: PatientRecord,
+        state: Dict[str, Any],
+        task_params: Optional[Dict[str, Any]] = None,
+    ) -> "RiskAssessmentTaskInput":
         target, horizon = _plan_target_and_horizon(plan, task_params, fallback_target="risk_target")
         policy = plan.constraints.risk_level_policy
         tp = task_params or {}
@@ -412,67 +420,120 @@ class RiskAssessmentTask(TaskBase):
             rlp = tp["risk_level_policy"]
             low = coerce_probability(rlp.get("low_lt", policy.low_lt), default=policy.low_lt)
             mod = coerce_probability(rlp.get("moderate_lt", policy.moderate_lt), default=policy.moderate_lt)
-            # local policy override without mutating plan
-            class _Tmp:
-                def __init__(self, low_lt: float, moderate_lt: float):
-                    self.low_lt = low_lt
-                    self.moderate_lt = moderate_lt
-                def to_level(self, p: float) -> str:
-                    if p < self.low_lt:
-                        return "low"
-                    if p < self.moderate_lt:
-                        return "moderate"
-                    return "high"
-            policy_obj: Any = _Tmp(low, mod)
         else:
-            policy_obj = policy
+            low = policy.low_lt
+            mod = policy.moderate_lt
 
-        system, user = prompts.risk_assessment_prompt(
+        return RiskAssessmentTaskInput(
             patient_id=patient.patient_id,
-            target=target,
-            horizon=horizon,
+            target_condition=target,
+            horizon_months=horizon,
             notes=_patient_notes_for_prompt(patient),
+            risk_level_low_lt=low,
+            risk_level_moderate_lt=mod,
         )
-        obj = ctx.llm.json_object_no_tools(system=system, user=user, temperature=0.0)
-        rp = coerce_probability(obj.get("risk_probability"), default=0.01)
-        risk_level = policy_obj.to_level(rp)
-        payload = normalize_risk_payload(obj, patient_id=patient.patient_id, target_condition=target, horizon_months=horizon, risk_level=risk_level)
+
+    def build_prompt_parts(self, task_input: "RiskAssessmentTaskInput") -> tuple[str, str]:
+        return prompts.risk_assessment_prompt(
+            patient_id=task_input.patient_id,
+            target=task_input.target_condition,
+            horizon=task_input.horizon_months,
+            notes=task_input.notes,
+        )
+
+    def post_process(
+        self,
+        *,
+        task_input: "RiskAssessmentTaskInput",
+        result: RiskAssessmentSchema,
+        plan: ClinicPlanSchema,
+        patient: PatientRecord,
+        state: Dict[str, Any],
+        task_params: Optional[Dict[str, Any]] = None,
+    ) -> RiskAssessmentSchema:
+        payload = result.model_dump()
+        rp = coerce_probability(payload.get("risk_probability"), default=0.01)
+        if rp < task_input.risk_level_low_lt:
+            risk_level = "low"
+        elif rp < task_input.risk_level_moderate_lt:
+            risk_level = "moderate"
+        else:
+            risk_level = "high"
+        payload = normalize_risk_payload(
+            payload,
+            patient_id=patient.patient_id,
+            target_condition=task_input.target_condition,
+            horizon_months=task_input.horizon_months,
+            risk_level=risk_level,
+        )
         out = RiskAssessmentSchema.model_validate(payload)
         state.setdefault("risk_by_patient", {})[patient.patient_id] = out
         return out
 
 
-class QueuePrioritizationTask(TaskBase):
+class QueuePrioritizationTask(AgentBackedTask["QueuePrioritizationTaskInput", QueuePrioritizationSchema]):
     name = "queue_prioritization"
+    output_model = QueuePrioritizationSchema
 
-    def run(self, *, ctx: TaskContext, plan: ClinicPlanSchema, patient: PatientRecord, state: Dict[str, Any], task_params: Optional[Dict[str, Any]] = None) -> QueuePrioritizationSchema:
+    def build_input(
+        self,
+        *,
+        plan: ClinicPlanSchema,
+        patient: PatientRecord,
+        state: Dict[str, Any],
+        task_params: Optional[Dict[str, Any]] = None,
+    ) -> "QueuePrioritizationTaskInput":
         workflow = state.get("workflow")
         risk = _get_risk(state, patient.patient_id)
         summ = _get_summary(state, patient.patient_id)
         gap = _get_followup_gap(state, patient.patient_id)
         target, horizon = _plan_target_and_horizon(plan, task_params)
-        system, user = prompts.queue_prioritization_prompt(
+        return QueuePrioritizationTaskInput(
             clinic_goals=plan.clinic_description,
             workflow_json=workflow.model_dump_json(indent=2) if workflow else "{}",
             patient_id=patient.patient_id,
             notes=_patient_notes_for_prompt(patient),
-            target=target,
-            horizon=horizon,
+            target_condition=target,
+            horizon_months=horizon,
             risk_json=risk.model_dump_json(indent=2) if risk else "none",
             summary_json=summ.model_dump_json(indent=2) if summ else "none",
             followup_gap_json=gap.model_dump_json(indent=2) if gap else "none",
         )
-        obj = ctx.llm.json_object_no_tools(system=system, user=user, temperature=0.0)
-        score = coerce_probability(obj.get("priority_score"), default=0.25)
-        level = first_non_empty(obj.get("priority_level"), default=("high" if score >= 0.6 else "moderate" if score >= 0.3 else "low"))
+
+    def build_prompt_parts(self, task_input: "QueuePrioritizationTaskInput") -> tuple[str, str]:
+        return prompts.queue_prioritization_prompt(
+            clinic_goals=task_input.clinic_goals,
+            workflow_json=task_input.workflow_json,
+            patient_id=task_input.patient_id,
+            notes=task_input.notes,
+            target=task_input.target_condition,
+            horizon=task_input.horizon_months,
+            risk_json=task_input.risk_json,
+            summary_json=task_input.summary_json,
+            followup_gap_json=task_input.followup_gap_json,
+        )
+
+    def post_process(
+        self,
+        *,
+        task_input: "QueuePrioritizationTaskInput",
+        result: QueuePrioritizationSchema,
+        plan: ClinicPlanSchema,
+        patient: PatientRecord,
+        state: Dict[str, Any],
+        task_params: Optional[Dict[str, Any]] = None,
+    ) -> QueuePrioritizationSchema:
+        payload = result.model_dump()
+        score = coerce_probability(payload.get("priority_score"), default=0.25)
+        level = first_non_empty(payload.get("priority_level"), default=("high" if score >= 0.6 else "moderate" if score >= 0.3 else "low"))
         if level not in {"low", "moderate", "high"}:
             level = "moderate"
         out = QueuePrioritizationSchema(
             patient_id=patient.patient_id,
             priority_score=score,
             priority_level=level,
-            queue_reason=first_non_empty(obj.get("queue_reason"), default="Prioritized based on note acuity and follow-up needs."),
-            recommended_window=first_non_empty(obj.get("recommended_window"), default="next routine review"),
+            queue_reason=first_non_empty(payload.get("queue_reason"), default="Prioritized based on note acuity and follow-up needs."),
+            recommended_window=first_non_empty(payload.get("recommended_window"), default="next routine review"),
         )
         state.setdefault("queue_priority_by_patient", {})[patient.patient_id] = out
         return out
@@ -483,6 +544,27 @@ class ClinicianSummaryTaskInput(BaseModel):
     horizon_months: int
     risk_json: str
     notes: str
+
+
+class RiskAssessmentTaskInput(BaseModel):
+    patient_id: str
+    target_condition: str
+    horizon_months: int
+    notes: str
+    risk_level_low_lt: float
+    risk_level_moderate_lt: float
+
+
+class QueuePrioritizationTaskInput(BaseModel):
+    clinic_goals: str
+    workflow_json: str
+    patient_id: str
+    notes: str
+    target_condition: str
+    horizon_months: int
+    risk_json: str
+    summary_json: str
+    followup_gap_json: str
 
 
 class ResultsSummaryTaskInput(BaseModel):
@@ -504,6 +586,23 @@ class LabTrendSummaryTaskInput(BaseModel):
     timeframe_label: str
     patient_id: str
     notes: str
+
+
+class DifferentialDiagnosisTaskInput(BaseModel):
+    patient_id: str
+    target_condition: str
+    horizon_months: int
+    summary_json: str
+    notes: str
+
+
+class GuidelineComparisonTaskInput(BaseModel):
+    patient_id: str
+    target_condition: str
+    horizon_months: int
+    notes: str
+    risk_json: str
+    summary_json: str
 
 
 class ClinicianSummaryTask(AgentBackedTask[ClinicianSummaryTaskInput, ClinicianSummarySchema]):
@@ -731,51 +830,108 @@ class ReferralLetterTask(TaskBase):
         )
 
 
-class DifferentialDiagnosisTask(TaskBase):
+class DifferentialDiagnosisTask(AgentBackedTask[DifferentialDiagnosisTaskInput, DifferentialDiagnosisSchema]):
     name = "differential_diagnosis"
+    output_model = DifferentialDiagnosisSchema
 
-    def run(self, *, ctx: TaskContext, plan: ClinicPlanSchema, patient: PatientRecord, state: Dict[str, Any], task_params: Optional[Dict[str, Any]] = None) -> DifferentialDiagnosisSchema:
+    def build_input(
+        self,
+        *,
+        plan: ClinicPlanSchema,
+        patient: PatientRecord,
+        state: Dict[str, Any],
+        task_params: Optional[Dict[str, Any]] = None,
+    ) -> DifferentialDiagnosisTaskInput:
         target, horizon = _plan_target_and_horizon(plan, task_params)
         summ = _get_summary(state, patient.patient_id)
-        system, user = prompts.differential_prompt(
-            patient_id=patient.patient_id,
-            target=target,
-            horizon=horizon,
-            summary_json=summ.model_dump_json(indent=2) if summ else "none",
-            notes=_patient_notes_for_prompt(patient),
-        )
-        obj = ctx.llm.json_object_no_tools(system=system, user=user, temperature=0.0)
-        return DifferentialDiagnosisSchema(
+        return DifferentialDiagnosisTaskInput(
             patient_id=patient.patient_id,
             target_condition=target,
             horizon_months=horizon,
-            possible_diagnoses=ensure_list_str(obj.get("possible_diagnoses") or ["Insufficient data to propose a useful differential"]) ,
-            reasoning=first_non_empty(obj.get("reasoning"), default="Use as a brainstorming aid only; confirm clinically."),
+            summary_json=summ.model_dump_json(indent=2) if summ else "none",
+            notes=_patient_notes_for_prompt(patient),
+        )
+
+    def build_prompt_parts(self, task_input: DifferentialDiagnosisTaskInput) -> tuple[str, str]:
+        return prompts.differential_prompt(
+            patient_id=task_input.patient_id,
+            target=task_input.target_condition,
+            horizon=task_input.horizon_months,
+            summary_json=task_input.summary_json,
+            notes=task_input.notes,
+        )
+
+    def post_process(
+        self,
+        *,
+        task_input: DifferentialDiagnosisTaskInput,
+        result: DifferentialDiagnosisSchema,
+        plan: ClinicPlanSchema,
+        patient: PatientRecord,
+        state: Dict[str, Any],
+        task_params: Optional[Dict[str, Any]] = None,
+    ) -> DifferentialDiagnosisSchema:
+        payload = result.model_dump()
+        return DifferentialDiagnosisSchema(
+            patient_id=patient.patient_id,
+            target_condition=task_input.target_condition,
+            horizon_months=task_input.horizon_months,
+            possible_diagnoses=ensure_list_str(payload.get("possible_diagnoses") or ["Insufficient data to propose a useful differential"]),
+            reasoning=first_non_empty(payload.get("reasoning"), default="Use as a brainstorming aid only; confirm clinically."),
         )
 
 
-class GuidelineComparisonTask(TaskBase):
+class GuidelineComparisonTask(AgentBackedTask[GuidelineComparisonTaskInput, GuidelineComparisonSchema]):
     name = "guideline_comparison"
+    output_model = GuidelineComparisonSchema
 
-    def run(self, *, ctx: TaskContext, plan: ClinicPlanSchema, patient: PatientRecord, state: Dict[str, Any], task_params: Optional[Dict[str, Any]] = None) -> GuidelineComparisonSchema:
+    def build_input(
+        self,
+        *,
+        plan: ClinicPlanSchema,
+        patient: PatientRecord,
+        state: Dict[str, Any],
+        task_params: Optional[Dict[str, Any]] = None,
+    ) -> GuidelineComparisonTaskInput:
         target, horizon = _plan_target_and_horizon(plan, task_params)
         risk = _get_risk(state, patient.patient_id)
         summ = _get_summary(state, patient.patient_id)
-        system, user = prompts.guideline_comparison_prompt(
+        return GuidelineComparisonTaskInput(
             patient_id=patient.patient_id,
-            target=target,
-            horizon=horizon,
+            target_condition=target,
+            horizon_months=horizon,
             notes=_patient_notes_for_prompt(patient),
             risk_json=risk.model_dump_json(indent=2) if risk else "none",
             summary_json=summ.model_dump_json(indent=2) if summ else "none",
         )
-        obj = ctx.llm.json_object_no_tools(system=system, user=user, temperature=0.0)
+
+    def build_prompt_parts(self, task_input: GuidelineComparisonTaskInput) -> tuple[str, str]:
+        return prompts.guideline_comparison_prompt(
+            patient_id=task_input.patient_id,
+            target=task_input.target_condition,
+            horizon=task_input.horizon_months,
+            notes=task_input.notes,
+            risk_json=task_input.risk_json,
+            summary_json=task_input.summary_json,
+        )
+
+    def post_process(
+        self,
+        *,
+        task_input: GuidelineComparisonTaskInput,
+        result: GuidelineComparisonSchema,
+        plan: ClinicPlanSchema,
+        patient: PatientRecord,
+        state: Dict[str, Any],
+        task_params: Optional[Dict[str, Any]] = None,
+    ) -> GuidelineComparisonSchema:
+        payload = result.model_dump()
         out = GuidelineComparisonSchema(
             patient_id=patient.patient_id,
-            target_condition=target,
-            horizon_months=horizon,
-            recommended_guidelines=ensure_list_str(obj.get("recommended_guidelines") or ["Use local clinic and specialty pathway guidelines"]),
-            evidence_summary=first_non_empty(obj.get("evidence_summary"), default="Guideline mapping requires clinician confirmation."),
+            target_condition=task_input.target_condition,
+            horizon_months=task_input.horizon_months,
+            recommended_guidelines=ensure_list_str(payload.get("recommended_guidelines") or ["Use local clinic and specialty pathway guidelines"]),
+            evidence_summary=first_non_empty(payload.get("evidence_summary"), default="Guideline mapping requires clinician confirmation."),
         )
         state.setdefault("guideline_comparison_by_patient", {})[patient.patient_id] = out
         return out
