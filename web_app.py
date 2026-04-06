@@ -32,11 +32,18 @@ _arg_parser.add_argument("--endpoint", default=os.environ.get("FACETCARE_ENDPOIN
 _arg_parser.add_argument("--model", default=os.environ.get("FACETCARE_MODEL", "medgemma"), help="Model name")
 _arg_parser.add_argument("--host", default=os.environ.get("FACETCARE_HOST", "127.0.0.1"), help="Flask host (default: 127.0.0.1)")
 _arg_parser.add_argument("--port", type=int, default=int(os.environ.get("FACETCARE_PORT", "5000")), help="Flask port (default: 5000)")
+_arg_parser.add_argument(
+    "--timeout",
+    type=float,
+    default=float(os.environ.get("FACETCARE_LLM_TIMEOUT", "60")),
+    help="LLM request timeout in seconds (default: 60)",
+)
 _args, _unknown = _arg_parser.parse_known_args()
 
 ENDPOINT = _args.endpoint
 MODEL = _args.model
-CLIENT = OpenAI(base_url=ENDPOINT, api_key="")
+LLM_TIMEOUT = _args.timeout
+CLIENT = OpenAI(base_url=ENDPOINT, api_key="", timeout=LLM_TIMEOUT)
 
 app = Flask(__name__)
 
@@ -1049,7 +1056,7 @@ def setup_plan():
             msg = "Plan generated. Review and edit it on the Plan page."
             return redirect(url_for("plan_page"))
         except Exception as e:
-            msg = f"Plan generation failed: {e}"
+            msg = f"Plan generation failed: {type(e).__name__}: {e}"
 
     tpl = """
 <!DOCTYPE html>

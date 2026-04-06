@@ -173,7 +173,7 @@ conda create -n FacetCare python=3.11 -y
 conda activate FacetCare
 
 # Install dependencies
-pip install pydantic openai
+pip install pydantic-ai flask openai
 ```
 
 If you prefer plain `venv`:
@@ -181,7 +181,9 @@ If you prefer plain `venv`:
 ```bash
 python -m venv FacetCare
 source FacetCare/bin/activate        # Windows: FacetCare\Scripts\activate
-pip install pydantic openai
+
+# Install dependencies
+pip install pydantic-ai flask openai
 ```
 
 ## Run

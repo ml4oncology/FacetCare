@@ -2,8 +2,14 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import datetime as dt
+import os
 import re
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Generic, List, Optional, Type, TypeVar
+
+from pydantic import BaseModel
+from pydantic_ai import Agent
+from pydantic_ai.models.openai import OpenAIChatModel
+from pydantic_ai.providers.openai import OpenAIProvider
 
 from .llm_client import LLMJsonClient
 from . import prompts
@@ -46,6 +52,101 @@ class TaskBase:
         task_params: Optional[Dict[str, Any]] = None,
     ) -> Any:
         raise NotImplementedError
+
+TaskInputT = TypeVar("TaskInputT", bound=BaseModel)
+TaskOutputT = TypeVar("TaskOutputT", bound=BaseModel)
+
+
+class AgentBackedTask(TaskBase, Generic[TaskInputT, TaskOutputT]):
+    output_model: Type[TaskOutputT]
+
+    def build_input(
+        self,
+        *,
+        plan: ClinicPlanSchema,
+        patient: PatientRecord,
+        state: Dict[str, Any],
+        task_params: Optional[Dict[str, Any]] = None,
+    ) -> TaskInputT:
+        raise NotImplementedError
+
+    def build_prompt_parts(self, task_input: TaskInputT) -> tuple[str, str]:
+        raise NotImplementedError
+
+    def tools(self, task_input: TaskInputT) -> List[Any]:
+        return []
+
+    def build_model(self, *, ctx: TaskContext) -> OpenAIChatModel:
+        model_name = getattr(ctx.llm, "model", None) or "gpt-4o-mini"
+        base_url = str(getattr(ctx.llm.client, "base_url", "") or "")
+        api_key = getattr(ctx.llm.client, "api_key", None) or "sk-local"
+
+        provider = OpenAIProvider(
+            base_url=base_url,
+            api_key=api_key,
+        )
+        return OpenAIChatModel(
+            model_name,
+            provider=provider,
+            system_prompt_role="user",
+        )
+
+    def post_process(
+        self,
+        *,
+        task_input: TaskInputT,
+        result: TaskOutputT,
+        plan: ClinicPlanSchema,
+        patient: PatientRecord,
+        state: Dict[str, Any],
+        task_params: Optional[Dict[str, Any]] = None,
+    ) -> TaskOutputT:
+        return result
+
+    def run_agent(
+        self,
+        *,
+        ctx: TaskContext,
+        task_input: TaskInputT,
+    ) -> TaskOutputT:
+        system, user = self.build_prompt_parts(task_input)
+        model = self.build_model(ctx=ctx)
+
+        agent = Agent(
+            model=model,
+            output_type=self.output_model,
+            instructions=system,
+            tools=self.tools(task_input),
+            retries=1,
+            output_retries=1,
+        )
+        run_result = agent.run_sync(user)
+        return run_result.output
+
+    def run(
+        self,
+        *,
+        ctx: TaskContext,
+        plan: ClinicPlanSchema,
+        patient: PatientRecord,
+        state: Dict[str, Any],
+        task_params: Optional[Dict[str, Any]] = None,
+    ) -> TaskOutputT:
+        task_input = self.build_input(
+            plan=plan,
+            patient=patient,
+            state=state,
+            task_params=task_params,
+        )
+        result = self.run_agent(ctx=ctx, task_input=task_input)
+        return self.post_process(
+            task_input=task_input,
+            result=result,
+            plan=plan,
+            patient=patient,
+            state=state,
+            task_params=task_params,
+        )
 
 
 def _plan_target_and_horizon(plan: ClinicPlanSchema, task_params: Optional[Dict[str, Any]], fallback_target: str = "general_clinical_review") -> tuple[str, int]:
@@ -97,9 +198,9 @@ def _patient_demographics(patient: PatientRecord) -> Dict[str, str]:
 def _patient_notes_for_prompt(patient: PatientRecord) -> str:
     base_notes = str(getattr(patient, "longitudinal_notes", "") or "").strip()
     demo = _patient_demographics(patient)
-    if not demo:
-        return base_notes
-    lines: List[str] = ["PATIENT HEADER (chart metadata):"]
+    lines: List[str] = []
+    if demo:
+        lines.append("PATIENT HEADER (chart metadata):")
     label_map = {
         "patient_name": "Patient name",
         "date_of_birth": "DOB",
@@ -108,13 +209,29 @@ def _patient_notes_for_prompt(patient: PatientRecord) -> str:
         "address": "Address",
         "phone": "Phone",
     }
-    for key in ["patient_name", "date_of_birth", "sex", "ohip_number", "address", "phone"]:
-        if key in demo:
-            lines.append(f"- {label_map[key]}: {demo[key]}")
-    if getattr(patient, "longitudinal_note_entries", None):
-        lines.append(f"- Longitudinal note count: {len(patient.longitudinal_note_entries)}")
-    if base_notes:
-        lines.extend(["", "LONGITUDINAL CLINIC NOTES:", base_notes])
+    if demo:
+        for key in ["patient_name", "date_of_birth", "sex", "ohip_number", "address", "phone"]:
+            if key in demo:
+                lines.append(f"- {label_map[key]}: {demo[key]}")
+        if getattr(patient, "longitudinal_note_entries", None):
+            lines.append(f"- Longitudinal note count: {len(patient.longitudinal_note_entries)}")
+
+    max_chars = int(os.getenv("FACETCARE_MAX_NOTE_CHARS", "3500") or "3500")
+    trimmed_notes = base_notes
+    if max_chars > 0 and len(base_notes) > max_chars:
+        head = max_chars // 2
+        tail = max_chars - head
+        trimmed_notes = (
+            base_notes[:head].rstrip()
+            + "\n\n[... note truncated for model context budget ...]\n\n"
+            + base_notes[-tail:].lstrip()
+        )
+
+    if trimmed_notes:
+        if lines:
+            lines.extend(["", "LONGITUDINAL CLINIC NOTES:", trimmed_notes])
+        else:
+            lines.append(trimmed_notes)
     return "\n".join(lines).strip()
 
 
@@ -360,24 +477,63 @@ class QueuePrioritizationTask(TaskBase):
         state.setdefault("queue_priority_by_patient", {})[patient.patient_id] = out
         return out
 
+class ClinicianSummaryTaskInput(BaseModel):
+    patient_id: str
+    target_condition: str
+    horizon_months: int
+    risk_json: str
+    notes: str
 
-class ClinicianSummaryTask(TaskBase):
+class ClinicianSummaryTask(AgentBackedTask[ClinicianSummaryTaskInput, ClinicianSummarySchema]):
     name = "clinician_summary"
+    output_model = ClinicianSummarySchema
 
-    def run(self, *, ctx: TaskContext, plan: ClinicPlanSchema, patient: PatientRecord, state: Dict[str, Any], task_params: Optional[Dict[str, Any]] = None) -> ClinicianSummarySchema:
+    def build_input(
+        self,
+        *,
+        plan: ClinicPlanSchema,
+        patient: PatientRecord,
+        state: Dict[str, Any],
+        task_params: Optional[Dict[str, Any]] = None,
+    ) -> ClinicianSummaryTaskInput:
         risk = _get_risk(state, patient.patient_id)
         target, horizon = _plan_target_and_horizon(plan, task_params)
         if risk is not None:
             target, horizon = risk.target_condition, risk.horizon_months
-        system, user = prompts.clinician_summary_prompt(
+
+        return ClinicianSummaryTaskInput(
             patient_id=patient.patient_id,
-            target=target,
-            horizon=horizon,
+            target_condition=target,
+            horizon_months=horizon,
             risk_json=risk.model_dump_json(indent=2) if risk else "not provided",
             notes=_patient_notes_for_prompt(patient),
         )
-        obj = ctx.llm.json_object_no_tools(system=system, user=user, temperature=0.0)
-        payload = normalize_clinician_summary_payload(obj, patient_id=patient.patient_id, target_condition=target, horizon_months=horizon)
+
+    def build_prompt_parts(self, task_input: ClinicianSummaryTaskInput) -> tuple[str, str]:
+        return prompts.clinician_summary_prompt(
+            patient_id=task_input.patient_id,
+            target=task_input.target_condition,
+            horizon=task_input.horizon_months,
+            risk_json=task_input.risk_json,
+            notes=task_input.notes,
+        )
+
+    def post_process(
+        self,
+        *,
+        task_input: ClinicianSummaryTaskInput,
+        result: ClinicianSummarySchema,
+        plan: ClinicPlanSchema,
+        patient: PatientRecord,
+        state: Dict[str, Any],
+        task_params: Optional[Dict[str, Any]] = None,
+    ) -> ClinicianSummarySchema:
+        payload = normalize_clinician_summary_payload(
+            result.model_dump(),
+            patient_id=patient.patient_id,
+            target_condition=task_input.target_condition,
+            horizon_months=task_input.horizon_months,
+        )
         out = ClinicianSummarySchema.model_validate(payload)
         state.setdefault("clinician_summary_by_patient", {})[patient.patient_id] = out
         return out

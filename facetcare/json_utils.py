@@ -13,6 +13,25 @@ def _strip_code_fences(text: str) -> str:
     return s.strip()
 
 
+def _strip_llm_channel_wrappers(text: str) -> str:
+    s = (text or "").strip()
+    if not s:
+        return s
+
+    # Some GPT-OSS / llama.cpp configurations emit role/channel control tokens
+    # around the actual assistant payload. Prefer the last assistant/final message body.
+    message_matches = list(re.finditer(r"<\|message\|>", s))
+    if not message_matches:
+        return s
+
+    last = message_matches[-1]
+    body = s[last.end():]
+    end_marker = body.find("<|end|>")
+    if end_marker >= 0:
+        body = body[:end_marker]
+    return body.strip() or s
+
+
 def _extract_balanced_block(s: str, start_idx: int) -> tuple[str, int]:
     opener = s[start_idx]
     closer = "}" if opener == "{" else "]"
@@ -121,7 +140,7 @@ def _unwrap_quoted_json_fragments(s: str) -> str:
 
 
 def _light_json_repairs(s: str) -> str:
-    s = _strip_code_fences(s)
+    s = _strip_llm_channel_wrappers(_strip_code_fences(s))
     # common smart quotes
     s = s.replace("“", '"').replace("”", '"').replace("’", "'")
     # unwrap accidental quoted JSON objects in arrays or fields
