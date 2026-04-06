@@ -484,6 +484,28 @@ class ClinicianSummaryTaskInput(BaseModel):
     risk_json: str
     notes: str
 
+
+class ResultsSummaryTaskInput(BaseModel):
+    patient_id: str
+    target_condition: str
+    horizon_months: int
+    notes: str
+
+
+class FollowupGapDetectionTaskInput(BaseModel):
+    clinic_goals: str
+    patient_id: str
+    notes: str
+    summary_json: str
+    risk_json: str
+
+
+class LabTrendSummaryTaskInput(BaseModel):
+    timeframe_label: str
+    patient_id: str
+    notes: str
+
+
 class ClinicianSummaryTask(AgentBackedTask[ClinicianSummaryTaskInput, ClinicianSummarySchema]):
     name = "clinician_summary"
     output_model = ClinicianSummarySchema
@@ -616,25 +638,52 @@ class PatientInstructionsTask(TaskBase):
         return out
 
 
-class ResultsSummaryTask(TaskBase):
+class ResultsSummaryTask(AgentBackedTask[ResultsSummaryTaskInput, ResultsSummarySchema]):
     name = "results_summary"
+    output_model = ResultsSummarySchema
 
-    def run(self, *, ctx: TaskContext, plan: ClinicPlanSchema, patient: PatientRecord, state: Dict[str, Any], task_params: Optional[Dict[str, Any]] = None) -> ResultsSummarySchema:
+    def build_input(
+        self,
+        *,
+        plan: ClinicPlanSchema,
+        patient: PatientRecord,
+        state: Dict[str, Any],
+        task_params: Optional[Dict[str, Any]] = None,
+    ) -> ResultsSummaryTaskInput:
         target, horizon = _plan_target_and_horizon(plan, task_params)
-        system, user = prompts.results_summary_prompt(
-            patient_id=patient.patient_id,
-            target=target,
-            horizon=horizon,
-            notes=_patient_notes_for_prompt(patient),
-        )
-        obj = ctx.llm.json_object_no_tools(system=system, user=user, temperature=0.0)
-        return ResultsSummarySchema(
+        return ResultsSummaryTaskInput(
             patient_id=patient.patient_id,
             target_condition=target,
             horizon_months=horizon,
-            labs_summary=first_non_empty(obj.get("labs_summary"), default="No structured lab values were provided in the notes."),
-            imaging_summary=first_non_empty(obj.get("imaging_summary"), default="No imaging details found in the provided notes."),
-            trending_summary=first_non_empty(obj.get("trending_summary"), default="Trend assessment limited to free-text note patterns."),
+            notes=_patient_notes_for_prompt(patient),
+        )
+
+    def build_prompt_parts(self, task_input: ResultsSummaryTaskInput) -> tuple[str, str]:
+        return prompts.results_summary_prompt(
+            patient_id=task_input.patient_id,
+            target=task_input.target_condition,
+            horizon=task_input.horizon_months,
+            notes=task_input.notes,
+        )
+
+    def post_process(
+        self,
+        *,
+        task_input: ResultsSummaryTaskInput,
+        result: ResultsSummarySchema,
+        plan: ClinicPlanSchema,
+        patient: PatientRecord,
+        state: Dict[str, Any],
+        task_params: Optional[Dict[str, Any]] = None,
+    ) -> ResultsSummarySchema:
+        payload = result.model_dump()
+        return ResultsSummarySchema(
+            patient_id=patient.patient_id,
+            target_condition=task_input.target_condition,
+            horizon_months=task_input.horizon_months,
+            labs_summary=first_non_empty(payload.get("labs_summary"), default="No structured lab values were provided in the notes."),
+            imaging_summary=first_non_empty(payload.get("imaging_summary"), default="No imaging details found in the provided notes."),
+            trending_summary=first_non_empty(payload.get("trending_summary"), default="Trend assessment limited to free-text note patterns."),
         )
 
 
@@ -732,28 +781,56 @@ class GuidelineComparisonTask(TaskBase):
         return out
 
 
-class FollowupGapDetectionTask(TaskBase):
+class FollowupGapDetectionTask(AgentBackedTask[FollowupGapDetectionTaskInput, FollowupGapSchema]):
     name = "followup_gap_detection"
+    output_model = FollowupGapSchema
 
-    def run(self, *, ctx: TaskContext, plan: ClinicPlanSchema, patient: PatientRecord, state: Dict[str, Any], task_params: Optional[Dict[str, Any]] = None) -> FollowupGapSchema:
+    def build_input(
+        self,
+        *,
+        plan: ClinicPlanSchema,
+        patient: PatientRecord,
+        state: Dict[str, Any],
+        task_params: Optional[Dict[str, Any]] = None,
+    ) -> FollowupGapDetectionTaskInput:
         summ = _get_summary(state, patient.patient_id)
         risk = _get_risk(state, patient.patient_id)
-        system, user = prompts.followup_gap_prompt(
+        return FollowupGapDetectionTaskInput(
             clinic_goals=plan.clinic_description,
             patient_id=patient.patient_id,
             notes=_patient_notes_for_prompt(patient),
             summary_json=summ.model_dump_json(indent=2) if summ else "none",
             risk_json=risk.model_dump_json(indent=2) if risk else "none",
         )
-        obj = ctx.llm.json_object_no_tools(system=system, user=user, temperature=0.0)
-        sev = first_non_empty(obj.get("gap_severity"), default="moderate")
+
+    def build_prompt_parts(self, task_input: FollowupGapDetectionTaskInput) -> tuple[str, str]:
+        return prompts.followup_gap_prompt(
+            clinic_goals=task_input.clinic_goals,
+            patient_id=task_input.patient_id,
+            notes=task_input.notes,
+            summary_json=task_input.summary_json,
+            risk_json=task_input.risk_json,
+        )
+
+    def post_process(
+        self,
+        *,
+        task_input: FollowupGapDetectionTaskInput,
+        result: FollowupGapSchema,
+        plan: ClinicPlanSchema,
+        patient: PatientRecord,
+        state: Dict[str, Any],
+        task_params: Optional[Dict[str, Any]] = None,
+    ) -> FollowupGapSchema:
+        payload = result.model_dump()
+        sev = first_non_empty(payload.get("gap_severity"), default="moderate")
         if sev not in {"low", "moderate", "high"}:
             sev = "moderate"
         out = FollowupGapSchema(
             patient_id=patient.patient_id,
-            pending_items=ensure_list_str(obj.get("pending_items") or ["Review chart for pending follow-up tasks"]),
-            missed_followup_signals=ensure_list_str(obj.get("missed_followup_signals") or ["Recurrent or unresolved issue mentioned in notes"]),
-            suggested_actions=ensure_list_str(obj.get("suggested_actions") or ["Schedule clinician review", "Confirm whether recommended tests were completed"]),
+            pending_items=ensure_list_str(payload.get("pending_items") or ["Review chart for pending follow-up tasks"]),
+            missed_followup_signals=ensure_list_str(payload.get("missed_followup_signals") or ["Recurrent or unresolved issue mentioned in notes"]),
+            suggested_actions=ensure_list_str(payload.get("suggested_actions") or ["Schedule clinician review", "Confirm whether recommended tests were completed"]),
             gap_severity=sev,
         )
         state.setdefault("followup_gap_by_patient", {})[patient.patient_id] = out
@@ -791,24 +868,50 @@ class ReferralIntakeChecklistTask(TaskBase):
         return out
 
 
-class LabTrendSummaryTask(TaskBase):
+class LabTrendSummaryTask(AgentBackedTask[LabTrendSummaryTaskInput, LabTrendSummarySchema]):
     name = "lab_trend_summary"
+    output_model = LabTrendSummarySchema
 
-    def run(self, *, ctx: TaskContext, plan: ClinicPlanSchema, patient: PatientRecord, state: Dict[str, Any], task_params: Optional[Dict[str, Any]] = None) -> LabTrendSummarySchema:
+    def build_input(
+        self,
+        *,
+        plan: ClinicPlanSchema,
+        patient: PatientRecord,
+        state: Dict[str, Any],
+        task_params: Optional[Dict[str, Any]] = None,
+    ) -> LabTrendSummaryTaskInput:
         timeframe = first_non_empty((task_params or {}).get("timeframe_label"), plan.constraints.cadence, default="recent period")
-        system, user = prompts.lab_trend_prompt(
-            timeframe=timeframe,
+        return LabTrendSummaryTaskInput(
+            timeframe_label=timeframe,
             patient_id=patient.patient_id,
             notes=_patient_notes_for_prompt(patient),
         )
-        obj = ctx.llm.json_object_no_tools(system=system, user=user, temperature=0.0)
+
+    def build_prompt_parts(self, task_input: LabTrendSummaryTaskInput) -> tuple[str, str]:
+        return prompts.lab_trend_prompt(
+            timeframe=task_input.timeframe_label,
+            patient_id=task_input.patient_id,
+            notes=task_input.notes,
+        )
+
+    def post_process(
+        self,
+        *,
+        task_input: LabTrendSummaryTaskInput,
+        result: LabTrendSummarySchema,
+        plan: ClinicPlanSchema,
+        patient: PatientRecord,
+        state: Dict[str, Any],
+        task_params: Optional[Dict[str, Any]] = None,
+    ) -> LabTrendSummarySchema:
+        payload = result.model_dump()
         out = LabTrendSummarySchema(
             patient_id=patient.patient_id,
-            timeframe_label=first_non_empty(obj.get("timeframe_label"), default=timeframe),
-            clinician_summary=first_non_empty(obj.get("clinician_summary"), default="Qualitative trend summary based on available note text."),
-            patient_friendly_summary=first_non_empty(obj.get("patient_friendly_summary"), default="Your chart notes were reviewed for important result trends."),
-            concerning_trends=ensure_list_str(obj.get("concerning_trends") or ["No explicit numeric trend available from free-text notes"]),
-            suggested_next_steps=ensure_list_str(obj.get("suggested_next_steps") or ["Review actual lab reports for confirmation"]),
+            timeframe_label=first_non_empty(payload.get("timeframe_label"), default=task_input.timeframe_label),
+            clinician_summary=first_non_empty(payload.get("clinician_summary"), default="Qualitative trend summary based on available note text."),
+            patient_friendly_summary=first_non_empty(payload.get("patient_friendly_summary"), default="Your chart notes were reviewed for important result trends."),
+            concerning_trends=ensure_list_str(payload.get("concerning_trends") or ["No explicit numeric trend available from free-text notes"]),
+            suggested_next_steps=ensure_list_str(payload.get("suggested_next_steps") or ["Review actual lab reports for confirmation"]),
         )
         state.setdefault("lab_trend_by_patient", {})[patient.patient_id] = out
         return out
