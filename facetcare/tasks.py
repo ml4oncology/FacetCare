@@ -261,9 +261,13 @@ def _format_referral_letter_text(
     recipient: str,
     urgency: str,
     llm_body: str,
-    referral: Optional[AdminReferralSchema],
-    risk: Optional[RiskAssessmentSchema],
-    summ: Optional[ClinicianSummarySchema],
+    referral_reason: Optional[str],
+    referral_request_to_specialist: Optional[str],
+    referral_required_pre_referral_steps: List[str],
+    risk_score_text: Optional[str],
+    risk_key_points: List[str],
+    summary_key_points: List[str],
+    summary_medications_to_review: List[str],
 ) -> str:
     demo = _patient_demographics(patient)
     patient_name = demo.get("patient_name") or patient.patient_id
@@ -285,34 +289,30 @@ def _format_referral_letter_text(
 
     referral_reason = ""
     request_line = ""
-    if isinstance(referral, AdminReferralSchema):
-        referral_reason = _clean_line(getattr(referral, "reason", "") or "")
-        request_line = _clean_line(getattr(referral, "request_to_specialist", "") or "")
+    if referral_reason:
+        referral_reason = _clean_line(referral_reason)
+    if referral_request_to_specialist:
+        request_line = _clean_line(referral_request_to_specialist)
     if not referral_reason:
         referral_reason = f"Assessment and management of concerns related to {target.replace('_', ' ')}"
     if not request_line:
         request_line = "I would appreciate your assessment and recommendations for next steps."
 
     key_bullets: List[str] = []
-    if risk is not None:
-        try:
-            key_bullets.append(f"Risk score {float(risk.risk_score):.2f} ({risk.risk_level})")
-        except Exception:
-            pass
-        for x in list(getattr(risk, "reasons", []) or [])[:3]:
-            x = _clean_line(x)
-            if x:
-                key_bullets.append(x)
-    if summ is not None:
-        for x in list(getattr(summ, "key_points", []) or [])[:4]:
-            x = _clean_line(x)
-            if x:
-                key_bullets.append(x)
-    if isinstance(referral, AdminReferralSchema):
-        for x in list(getattr(referral, "required_pre_referral_steps", []) or [])[:3]:
-            x = _clean_line(x)
-            if x:
-                key_bullets.append(x)
+    if risk_score_text:
+        key_bullets.append(_clean_line(f"Risk score {risk_score_text}"))
+    for x in list(risk_key_points or [])[:3]:
+        x = _clean_line(x)
+        if x:
+            key_bullets.append(x)
+    for x in list(summary_key_points or [])[:4]:
+        x = _clean_line(x)
+        if x:
+            key_bullets.append(x)
+    for x in list(referral_required_pre_referral_steps or [])[:3]:
+        x = _clean_line(x)
+        if x:
+            key_bullets.append(x)
     deduped: List[str] = []
     seen: set[str] = set()
     for x in key_bullets:
@@ -335,7 +335,7 @@ def _format_referral_letter_text(
         investigations_lines = ["Relevant investigations are described in the chart notes; exact values may be incomplete in free-text documentation."]
 
     history_line = "Relevant history and medications should be confirmed in the EMR medication/problem list."
-    meds = list(getattr(summ, "medications_to_review", []) or []) if summ is not None else []
+    meds = list(summary_medications_to_review or [])
     meds = [_clean_line(m) for m in meds if _clean_line(m)]
     if meds:
         history_line = "Medications to review: " + "; ".join(meds[:5])
@@ -605,6 +605,60 @@ class GuidelineComparisonTaskInput(BaseModel):
     summary_json: str
 
 
+class AdminReferralTaskInput(BaseModel):
+    patient_id: str
+    target_condition: str
+    destination_service: str
+    urgency: str
+    risk_json: str
+    summary_json: str
+    guideline_json: str
+    notes: str
+
+
+class PatientInstructionsTaskInput(BaseModel):
+    patient_id: str
+    target_condition: str
+    horizon_months: int
+    summary_json: str
+    risk_json: str
+    followup_gap_json: str
+    admin_referral_json: str
+    notes: str
+
+
+class ReferralLetterTaskInput(BaseModel):
+    patient_id: str
+    target_condition: str
+    urgency: str
+    recipient: str
+    referral_json: str
+    risk_json: str
+    summary_json: str
+    notes: str
+    risk_key_points: List[str]
+    risk_score_text: Optional[str] = None
+    summary_key_points: List[str]
+    summary_medications_to_review: List[str]
+    referral_reason: Optional[str] = None
+    referral_request_to_specialist: Optional[str] = None
+    referral_required_pre_referral_steps: List[str]
+
+
+class ReferralIntakeChecklistTaskInput(BaseModel):
+    destination_service: str
+    patient_id: str
+    notes: str
+    admin_referral_json: str
+    workflow_json: str
+
+
+class CarePlanReconciliationTaskInput(BaseModel):
+    clinic_goals: str
+    patient_id: str
+    notes: str
+
+
 class ClinicianSummaryTask(AgentBackedTask[ClinicianSummaryTaskInput, ClinicianSummarySchema]):
     name = "clinician_summary"
     output_model = ClinicianSummarySchema
@@ -660,10 +714,18 @@ class ClinicianSummaryTask(AgentBackedTask[ClinicianSummaryTaskInput, ClinicianS
         return out
 
 
-class AdminReferralTask(TaskBase):
+class AdminReferralTask(AgentBackedTask[AdminReferralTaskInput, AdminReferralSchema]):
     name = "admin_referral"
+    output_model = AdminReferralSchema
 
-    def run(self, *, ctx: TaskContext, plan: ClinicPlanSchema, patient: PatientRecord, state: Dict[str, Any], task_params: Optional[Dict[str, Any]] = None) -> AdminReferralSchema:
+    def build_input(
+        self,
+        *,
+        plan: ClinicPlanSchema,
+        patient: PatientRecord,
+        state: Dict[str, Any],
+        task_params: Optional[Dict[str, Any]] = None,
+    ) -> AdminReferralTaskInput:
         risk = _get_risk(state, patient.patient_id)
         summ = _get_summary(state, patient.patient_id)
         guideline = _get_guideline(state, patient.patient_id)
@@ -683,33 +745,64 @@ class AdminReferralTask(TaskBase):
         urgency = "routine"
         if risk is not None:
             urgency = "urgent" if risk.risk_level == "high" else ("semi-urgent" if risk.risk_level == "moderate" else "routine")
-        system, user = prompts.admin_referral_prompt(
+        return AdminReferralTaskInput(
             patient_id=patient.patient_id,
-            target=target,
-            destination=dest,
+            target_condition=target,
+            destination_service=dest,
+            urgency=urgency,
             risk_json=risk.model_dump_json(indent=2) if risk else "none",
             summary_json=summ.model_dump_json(indent=2) if summ else "none",
             guideline_json=guideline.model_dump_json(indent=2) if guideline else "none",
             notes=_patient_notes_for_prompt(patient),
         )
-        obj = ctx.llm.json_object_no_tools(system=system, user=user, temperature=0.0)
+
+    def build_prompt_parts(self, task_input: AdminReferralTaskInput) -> tuple[str, str]:
+        return prompts.admin_referral_prompt(
+            patient_id=task_input.patient_id,
+            target=task_input.target_condition,
+            destination=task_input.destination_service,
+            risk_json=task_input.risk_json,
+            summary_json=task_input.summary_json,
+            guideline_json=task_input.guideline_json,
+            notes=task_input.notes,
+        )
+
+    def post_process(
+        self,
+        *,
+        task_input: AdminReferralTaskInput,
+        result: AdminReferralSchema,
+        plan: ClinicPlanSchema,
+        patient: PatientRecord,
+        state: Dict[str, Any],
+        task_params: Optional[Dict[str, Any]] = None,
+    ) -> AdminReferralSchema:
+        payload = result.model_dump()
         out = AdminReferralSchema(
             patient_id=patient.patient_id,
-            target_condition=first_non_empty(obj.get("target_condition"), target),
-            urgency=first_non_empty(obj.get("urgency"), default=urgency) if first_non_empty(obj.get("urgency"), default=urgency) in {"routine", "semi-urgent", "urgent"} else urgency,
-            destination_service=first_non_empty(obj.get("destination_service"), default=dest),
-            reason_for_referral=first_non_empty(obj.get("reason_for_referral"), default="Clinical review identified need for specialty assessment."),
-            attach_documents=ensure_list_str(obj.get("attach_documents") or ["Recent clinic notes", "Medication list", "Relevant labs/imaging"]),
-            admin_notes=ensure_list_str(obj.get("admin_notes") or ["Verify referral completeness before sending"]),
+            target_condition=first_non_empty(payload.get("target_condition"), task_input.target_condition),
+            urgency=first_non_empty(payload.get("urgency"), default=task_input.urgency) if first_non_empty(payload.get("urgency"), default=task_input.urgency) in {"routine", "semi-urgent", "urgent"} else task_input.urgency,
+            destination_service=first_non_empty(payload.get("destination_service"), default=task_input.destination_service),
+            reason_for_referral=first_non_empty(payload.get("reason_for_referral"), default="Clinical review identified need for specialty assessment."),
+            attach_documents=ensure_list_str(payload.get("attach_documents") or ["Recent clinic notes", "Medication list", "Relevant labs/imaging"]),
+            admin_notes=ensure_list_str(payload.get("admin_notes") or ["Verify referral completeness before sending"]),
         )
         state.setdefault("admin_referral_by_patient", {})[patient.patient_id] = out
         return out
 
 
-class PatientInstructionsTask(TaskBase):
+class PatientInstructionsTask(AgentBackedTask[PatientInstructionsTaskInput, PatientInstructionsSchema]):
     name = "patient_instructions"
+    output_model = PatientInstructionsSchema
 
-    def run(self, *, ctx: TaskContext, plan: ClinicPlanSchema, patient: PatientRecord, state: Dict[str, Any], task_params: Optional[Dict[str, Any]] = None) -> PatientInstructionsSchema:
+    def build_input(
+        self,
+        *,
+        plan: ClinicPlanSchema,
+        patient: PatientRecord,
+        state: Dict[str, Any],
+        task_params: Optional[Dict[str, Any]] = None,
+    ) -> PatientInstructionsTaskInput:
         risk = _get_risk(state, patient.patient_id)
         summ = _get_summary(state, patient.patient_id)
         gap = _get_followup_gap(state, patient.patient_id)
@@ -717,22 +810,50 @@ class PatientInstructionsTask(TaskBase):
         target, horizon = _plan_target_and_horizon(plan, task_params)
         if risk:
             target, horizon = risk.target_condition, risk.horizon_months
-        system, user = prompts.patient_instructions_prompt(
+        return PatientInstructionsTaskInput(
             patient_id=patient.patient_id,
-            target=target,
-            horizon=horizon,
+            target_condition=target,
+            horizon_months=horizon,
             summary_json=summ.model_dump_json(indent=2) if summ else "none",
             risk_json=risk.model_dump_json(indent=2) if risk else "none",
             followup_gap_json=gap.model_dump_json(indent=2) if gap else "none",
             admin_referral_json=admin_ref.model_dump_json(indent=2) if admin_ref else "none",
             notes=_patient_notes_for_prompt(patient),
         )
-        obj = ctx.llm.json_object_no_tools(system=system, user=user, temperature=0.0)
-        instructions = ensure_list_str(obj.get("instructions")) or [
+
+    def build_prompt_parts(self, task_input: PatientInstructionsTaskInput) -> tuple[str, str]:
+        return prompts.patient_instructions_prompt(
+            patient_id=task_input.patient_id,
+            target=task_input.target_condition,
+            horizon=task_input.horizon_months,
+            summary_json=task_input.summary_json,
+            risk_json=task_input.risk_json,
+            followup_gap_json=task_input.followup_gap_json,
+            admin_referral_json=task_input.admin_referral_json,
+            notes=task_input.notes,
+        )
+
+    def post_process(
+        self,
+        *,
+        task_input: PatientInstructionsTaskInput,
+        result: PatientInstructionsSchema,
+        plan: ClinicPlanSchema,
+        patient: PatientRecord,
+        state: Dict[str, Any],
+        task_params: Optional[Dict[str, Any]] = None,
+    ) -> PatientInstructionsSchema:
+        payload = result.model_dump()
+        instructions = ensure_list_str(payload.get("instructions")) or [
             "Follow the clinic's recommended follow-up timeline.",
             "Seek urgent care if red-flag symptoms occur or worsen.",
         ]
-        out = PatientInstructionsSchema(patient_id=patient.patient_id, target_condition=target, horizon_months=horizon, instructions=instructions)
+        out = PatientInstructionsSchema(
+            patient_id=patient.patient_id,
+            target_condition=task_input.target_condition,
+            horizon_months=task_input.horizon_months,
+            instructions=instructions,
+        )
         state.setdefault("patient_instructions_by_patient", {})[patient.patient_id] = out
         return out
 
@@ -786,47 +907,94 @@ class ResultsSummaryTask(AgentBackedTask[ResultsSummaryTaskInput, ResultsSummary
         )
 
 
-class ReferralLetterTask(TaskBase):
+class ReferralLetterTask(AgentBackedTask[ReferralLetterTaskInput, ReferralLetterSchema]):
     name = "referral_letter"
+    output_model = ReferralLetterSchema
 
-    def run(self, *, ctx: TaskContext, plan: ClinicPlanSchema, patient: PatientRecord, state: Dict[str, Any], task_params: Optional[Dict[str, Any]] = None) -> ReferralLetterSchema:
+    def build_input(
+        self,
+        *,
+        plan: ClinicPlanSchema,
+        patient: PatientRecord,
+        state: Dict[str, Any],
+        task_params: Optional[Dict[str, Any]] = None,
+    ) -> ReferralLetterTaskInput:
         referral = state.get("admin_referral_by_patient", {}).get(patient.patient_id)
         risk = _get_risk(state, patient.patient_id)
         summ = _get_summary(state, patient.patient_id)
         target, _ = _plan_target_and_horizon(plan, task_params)
         urgency = referral.urgency if isinstance(referral, AdminReferralSchema) else ("urgent" if risk and risk.risk_level == "high" else "routine")
         recipient = referral.destination_service if isinstance(referral, AdminReferralSchema) else "Consult service"
-
-        system, user = prompts.referral_letter_prompt(
+        risk_score_text = None
+        if risk is not None:
+            try:
+                risk_score_text = f"{float(risk.risk_score):.2f} ({risk.risk_level})"
+            except Exception:
+                risk_score_text = None
+        return ReferralLetterTaskInput(
             patient_id=patient.patient_id,
-            target=target,
+            target_condition=target,
             urgency=urgency,
             recipient=recipient,
             referral_json=referral.model_dump_json(indent=2) if isinstance(referral, AdminReferralSchema) else "none",
             risk_json=risk.model_dump_json(indent=2) if risk else "none",
             summary_json=summ.model_dump_json(indent=2) if summ else "none",
             notes=_patient_notes_for_prompt(patient),
+            risk_key_points=list(getattr(risk, "reasons", []) or []) if risk is not None else [],
+            risk_score_text=risk_score_text,
+            summary_key_points=list(getattr(summ, "key_points", []) or []) if summ is not None else [],
+            summary_medications_to_review=list(getattr(summ, "medications_to_review", []) or []) if summ is not None else [],
+            referral_reason=(getattr(referral, "reason", None) if isinstance(referral, AdminReferralSchema) else None),
+            referral_request_to_specialist=(getattr(referral, "request_to_specialist", None) if isinstance(referral, AdminReferralSchema) else None),
+            referral_required_pre_referral_steps=list(getattr(referral, "required_pre_referral_steps", []) or []) if isinstance(referral, AdminReferralSchema) else [],
         )
-        obj = ctx.llm.json_object_no_tools(system=system, user=user, temperature=0.0)
-        raw_body = first_non_empty(obj.get("letter_body"), default=f"Referral request for {patient.patient_id} for further assessment.")
+
+    def build_prompt_parts(self, task_input: ReferralLetterTaskInput) -> tuple[str, str]:
+        return prompts.referral_letter_prompt(
+            patient_id=task_input.patient_id,
+            target=task_input.target_condition,
+            urgency=task_input.urgency,
+            recipient=task_input.recipient,
+            referral_json=task_input.referral_json,
+            risk_json=task_input.risk_json,
+            summary_json=task_input.summary_json,
+            notes=task_input.notes,
+        )
+
+    def post_process(
+        self,
+        *,
+        task_input: ReferralLetterTaskInput,
+        result: ReferralLetterSchema,
+        plan: ClinicPlanSchema,
+        patient: PatientRecord,
+        state: Dict[str, Any],
+        task_params: Optional[Dict[str, Any]] = None,
+    ) -> ReferralLetterSchema:
+        payload = result.model_dump()
+        raw_body = first_non_empty(payload.get("letter_body"), default=f"Referral request for {patient.patient_id} for further assessment.")
         body = _format_referral_letter_text(
             patient=patient,
             plan=plan,
-            target=target,
-            recipient=recipient,
-            urgency=urgency,
+            target=task_input.target_condition,
+            recipient=task_input.recipient,
+            urgency=task_input.urgency,
             llm_body=raw_body,
-            referral=referral if isinstance(referral, AdminReferralSchema) else None,
-            risk=risk,
-            summ=summ,
+            referral_reason=task_input.referral_reason,
+            referral_request_to_specialist=task_input.referral_request_to_specialist,
+            referral_required_pre_referral_steps=task_input.referral_required_pre_referral_steps,
+            risk_score_text=task_input.risk_score_text,
+            risk_key_points=task_input.risk_key_points,
+            summary_key_points=task_input.summary_key_points,
+            summary_medications_to_review=task_input.summary_medications_to_review,
         )
         return ReferralLetterSchema(
             patient_id=patient.patient_id,
-            target_condition=first_non_empty(obj.get("target_condition"), default=target),
-            urgency=(first_non_empty(obj.get("urgency"), default=urgency) if first_non_empty(obj.get("urgency"), default=urgency) in {"routine", "semi-urgent", "urgent"} else urgency),
-            recipient=first_non_empty(obj.get("recipient"), default=recipient),
+            target_condition=first_non_empty(payload.get("target_condition"), default=task_input.target_condition),
+            urgency=(first_non_empty(payload.get("urgency"), default=task_input.urgency) if first_non_empty(payload.get("urgency"), default=task_input.urgency) in {"routine", "semi-urgent", "urgent"} else task_input.urgency),
+            recipient=first_non_empty(payload.get("recipient"), default=task_input.recipient),
             letter_body=body,
-            attachments=ensure_list_str(obj.get("attachments") or ["Recent notes", "Medication list", "Pertinent results"]),
+            attachments=ensure_list_str(payload.get("attachments") or ["Recent notes", "Medication list", "Pertinent results"]),
         )
 
 
@@ -993,32 +1161,60 @@ class FollowupGapDetectionTask(AgentBackedTask[FollowupGapDetectionTaskInput, Fo
         return out
 
 
-class ReferralIntakeChecklistTask(TaskBase):
+class ReferralIntakeChecklistTask(AgentBackedTask[ReferralIntakeChecklistTaskInput, ReferralIntakeChecklistSchema]):
     name = "referral_intake_checklist"
+    output_model = ReferralIntakeChecklistSchema
 
-    def run(self, *, ctx: TaskContext, plan: ClinicPlanSchema, patient: PatientRecord, state: Dict[str, Any], task_params: Optional[Dict[str, Any]] = None) -> ReferralIntakeChecklistSchema:
+    def build_input(
+        self,
+        *,
+        plan: ClinicPlanSchema,
+        patient: PatientRecord,
+        state: Dict[str, Any],
+        task_params: Optional[Dict[str, Any]] = None,
+    ) -> ReferralIntakeChecklistTaskInput:
         workflow = state.get("workflow")
         default_dest = workflow.referral_pathway.external if isinstance(workflow, ClinicWorkflowSchema) else "Specialty clinic"
         dest = first_non_empty((task_params or {}).get("destination_service"), default=default_dest)
         admin_ref = state.get("admin_referral_by_patient", {}).get(patient.patient_id)
-        system, user = prompts.referral_intake_checklist_prompt(
-            destination=dest,
+        return ReferralIntakeChecklistTaskInput(
+            destination_service=dest,
             patient_id=patient.patient_id,
             notes=_patient_notes_for_prompt(patient),
             admin_referral_json=admin_ref.model_dump_json(indent=2) if isinstance(admin_ref, AdminReferralSchema) else "none",
             workflow_json=workflow.model_dump_json(indent=2) if isinstance(workflow, ClinicWorkflowSchema) else "none",
         )
-        obj = ctx.llm.json_object_no_tools(system=system, user=user, temperature=0.0)
-        triage = first_non_empty(obj.get("triage_bucket"), default="routine")
+
+    def build_prompt_parts(self, task_input: ReferralIntakeChecklistTaskInput) -> tuple[str, str]:
+        return prompts.referral_intake_checklist_prompt(
+            destination=task_input.destination_service,
+            patient_id=task_input.patient_id,
+            notes=task_input.notes,
+            admin_referral_json=task_input.admin_referral_json,
+            workflow_json=task_input.workflow_json,
+        )
+
+    def post_process(
+        self,
+        *,
+        task_input: ReferralIntakeChecklistTaskInput,
+        result: ReferralIntakeChecklistSchema,
+        plan: ClinicPlanSchema,
+        patient: PatientRecord,
+        state: Dict[str, Any],
+        task_params: Optional[Dict[str, Any]] = None,
+    ) -> ReferralIntakeChecklistSchema:
+        payload = result.model_dump()
+        triage = first_non_empty(payload.get("triage_bucket"), default="routine")
         if triage not in {"routine", "semi-urgent", "urgent"}:
             triage = "routine"
         out = ReferralIntakeChecklistSchema(
             patient_id=patient.patient_id,
-            destination_service=first_non_empty(obj.get("destination_service"), default=dest),
+            destination_service=first_non_empty(payload.get("destination_service"), default=task_input.destination_service),
             triage_bucket=triage,
-            available_info=ensure_list_str(obj.get("available_info") or ["Recent clinic notes"]),
-            missing_info=ensure_list_str(obj.get("missing_info") or ["Referral-specific required fields should be verified"]),
-            checklist_items=ensure_list_str(obj.get("checklist_items") or ["Confirm indication", "Attach key documents", "Verify contact details"]),
+            available_info=ensure_list_str(payload.get("available_info") or ["Recent clinic notes"]),
+            missing_info=ensure_list_str(payload.get("missing_info") or ["Referral-specific required fields should be verified"]),
+            checklist_items=ensure_list_str(payload.get("checklist_items") or ["Confirm indication", "Attach key documents", "Verify contact details"]),
         )
         state.setdefault("referral_intake_by_patient", {})[patient.patient_id] = out
         return out
@@ -1073,23 +1269,49 @@ class LabTrendSummaryTask(AgentBackedTask[LabTrendSummaryTaskInput, LabTrendSumm
         return out
 
 
-class CarePlanReconciliationTask(TaskBase):
+class CarePlanReconciliationTask(AgentBackedTask[CarePlanReconciliationTaskInput, CarePlanReconciliationSchema]):
     name = "care_plan_reconciliation"
+    output_model = CarePlanReconciliationSchema
 
-    def run(self, *, ctx: TaskContext, plan: ClinicPlanSchema, patient: PatientRecord, state: Dict[str, Any], task_params: Optional[Dict[str, Any]] = None) -> CarePlanReconciliationSchema:
-        system, user = prompts.care_plan_reconciliation_prompt(
+    def build_input(
+        self,
+        *,
+        plan: ClinicPlanSchema,
+        patient: PatientRecord,
+        state: Dict[str, Any],
+        task_params: Optional[Dict[str, Any]] = None,
+    ) -> CarePlanReconciliationTaskInput:
+        return CarePlanReconciliationTaskInput(
             clinic_goals=plan.clinic_description,
             patient_id=patient.patient_id,
             notes=_patient_notes_for_prompt(patient),
         )
-        obj = ctx.llm.json_object_no_tools(system=system, user=user, temperature=0.0)
+
+    def build_prompt_parts(self, task_input: CarePlanReconciliationTaskInput) -> tuple[str, str]:
+        return prompts.care_plan_reconciliation_prompt(
+            clinic_goals=task_input.clinic_goals,
+            patient_id=task_input.patient_id,
+            notes=task_input.notes,
+        )
+
+    def post_process(
+        self,
+        *,
+        task_input: CarePlanReconciliationTaskInput,
+        result: CarePlanReconciliationSchema,
+        plan: ClinicPlanSchema,
+        patient: PatientRecord,
+        state: Dict[str, Any],
+        task_params: Optional[Dict[str, Any]] = None,
+    ) -> CarePlanReconciliationSchema:
+        payload = result.model_dump()
         out = CarePlanReconciliationSchema(
             patient_id=patient.patient_id,
-            prior_plan_items=ensure_list_str(obj.get("prior_plan_items") or ["Prior care plan items not explicitly structured in notes"]),
-            completed_items=ensure_list_str(obj.get("completed_items")),
-            unresolved_items=ensure_list_str(obj.get("unresolved_items") or ["Open items require clinician review"]),
-            changed_items=ensure_list_str(obj.get("changed_items")),
-            suggested_next_steps=ensure_list_str(obj.get("suggested_next_steps") or ["Confirm active plan with patient at next review"]),
+            prior_plan_items=ensure_list_str(payload.get("prior_plan_items") or ["Prior care plan items not explicitly structured in notes"]),
+            completed_items=ensure_list_str(payload.get("completed_items")),
+            unresolved_items=ensure_list_str(payload.get("unresolved_items") or ["Open items require clinician review"]),
+            changed_items=ensure_list_str(payload.get("changed_items")),
+            suggested_next_steps=ensure_list_str(payload.get("suggested_next_steps") or ["Confirm active plan with patient at next review"]),
         )
         state.setdefault("care_plan_recon_by_patient", {})[patient.patient_id] = out
         return out
