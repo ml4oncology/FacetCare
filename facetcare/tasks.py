@@ -4,6 +4,8 @@ from dataclasses import dataclass
 import datetime as dt
 import os
 import re
+import sys
+import time
 from typing import Any, Dict, Generic, List, Optional, Type, TypeVar
 
 from pydantic import BaseModel
@@ -76,6 +78,17 @@ class AgentBackedTask(TaskBase, Generic[TaskInputT, TaskOutputT]):
     def tools(self, task_input: TaskInputT) -> List[Any]:
         return []
 
+    def _agent_debug_enabled(self) -> bool:
+        return str(os.getenv("FACETCARE_DEBUG_AGENT", "")).strip().lower() in {"1", "true", "yes", "on"}
+
+    def _agent_debug_log(self, message: str) -> None:
+        if self._agent_debug_enabled():
+            print(f"[facetcare.agent:{self.name}] {message}", file=sys.stderr, flush=True)
+
+    def _debug_preview(self, value: Any, limit: int = 600) -> str:
+        text = str(value or "").replace("\n", "\\n")
+        return text[:limit]
+
     def build_model(self, *, ctx: TaskContext) -> OpenAIChatModel:
         model_name = getattr(ctx.llm, "model", None) or "gpt-4o-mini"
         base_url = str(getattr(ctx.llm.client, "base_url", "") or "")
@@ -111,6 +124,13 @@ class AgentBackedTask(TaskBase, Generic[TaskInputT, TaskOutputT]):
     ) -> TaskOutputT:
         system, user = self.build_prompt_parts(task_input)
         model = self.build_model(ctx=ctx)
+        started = time.time()
+        self._agent_debug_log(
+            f"request start model={getattr(ctx.llm, 'model', None)!r} "
+            f"input_type={type(task_input).__name__} output_type={getattr(self.output_model, '__name__', self.output_model)!r} "
+            f"system_preview={self._debug_preview(system)!r} "
+            f"user_preview={self._debug_preview(user)!r}"
+        )
 
         agent = Agent(
             model=model,
@@ -120,7 +140,16 @@ class AgentBackedTask(TaskBase, Generic[TaskInputT, TaskOutputT]):
             retries=1,
             output_retries=1,
         )
-        run_result = agent.run_sync(user)
+        try:
+            run_result = agent.run_sync(user)
+        except Exception as e:
+            elapsed = time.time() - started
+            self._agent_debug_log(f"request error after {elapsed:.2f}s: {type(e).__name__}: {e}")
+            raise
+        elapsed = time.time() - started
+        self._agent_debug_log(
+            f"request ok after {elapsed:.2f}s output_preview={self._debug_preview(run_result.output)!r}"
+        )
         return run_result.output
 
     def run(
@@ -147,6 +176,127 @@ class AgentBackedTask(TaskBase, Generic[TaskInputT, TaskOutputT]):
             state=state,
             task_params=task_params,
         )
+
+
+class ClinicianSummaryTaskInput(BaseModel):
+    patient_id: str
+    target_condition: str
+    horizon_months: int
+    risk_json: str
+    notes: str
+
+
+class RiskAssessmentTaskInput(BaseModel):
+    patient_id: str
+    target_condition: str
+    horizon_months: int
+    notes: str
+    risk_level_low_lt: float
+    risk_level_moderate_lt: float
+
+
+class QueuePrioritizationTaskInput(BaseModel):
+    clinic_goals: str
+    workflow_json: str
+    patient_id: str
+    notes: str
+    target_condition: str
+    horizon_months: int
+    risk_json: str
+    summary_json: str
+    followup_gap_json: str
+
+
+class ResultsSummaryTaskInput(BaseModel):
+    patient_id: str
+    target_condition: str
+    horizon_months: int
+    notes: str
+
+
+class FollowupGapDetectionTaskInput(BaseModel):
+    clinic_goals: str
+    patient_id: str
+    notes: str
+    summary_json: str
+    risk_json: str
+
+
+class LabTrendSummaryTaskInput(BaseModel):
+    timeframe_label: str
+    patient_id: str
+    notes: str
+
+
+class DifferentialDiagnosisTaskInput(BaseModel):
+    patient_id: str
+    target_condition: str
+    horizon_months: int
+    summary_json: str
+    notes: str
+
+
+class GuidelineComparisonTaskInput(BaseModel):
+    patient_id: str
+    target_condition: str
+    horizon_months: int
+    notes: str
+    risk_json: str
+    summary_json: str
+
+
+class AdminReferralTaskInput(BaseModel):
+    patient_id: str
+    target_condition: str
+    destination_service: str
+    urgency: str
+    risk_json: str
+    summary_json: str
+    guideline_json: str
+    notes: str
+
+
+class PatientInstructionsTaskInput(BaseModel):
+    patient_id: str
+    target_condition: str
+    horizon_months: int
+    summary_json: str
+    risk_json: str
+    followup_gap_json: str
+    admin_referral_json: str
+    notes: str
+
+
+class ReferralLetterTaskInput(BaseModel):
+    patient_id: str
+    target_condition: str
+    urgency: str
+    recipient: str
+    referral_json: str
+    risk_json: str
+    summary_json: str
+    notes: str
+    risk_key_points: List[str]
+    risk_score_text: Optional[str] = None
+    summary_key_points: List[str]
+    summary_medications_to_review: List[str]
+    referral_reason: Optional[str] = None
+    referral_request_to_specialist: Optional[str] = None
+    referral_required_pre_referral_steps: List[str]
+
+
+class ReferralIntakeChecklistTaskInput(BaseModel):
+    destination_service: str
+    patient_id: str
+    notes: str
+    admin_referral_json: str
+    workflow_json: str
+
+
+class CarePlanReconciliationTaskInput(BaseModel):
+    clinic_goals: str
+    patient_id: str
+    notes: str
 
 
 def _plan_target_and_horizon(plan: ClinicPlanSchema, task_params: Optional[Dict[str, Any]], fallback_target: str = "general_clinical_review") -> tuple[str, int]:
@@ -287,14 +437,14 @@ def _format_referral_letter_text(
     if not clinic_name:
         clinic_name = "FacetCare Demo Clinic"
 
-    referral_reason = ""
+    reason_text = ""
     request_line = ""
     if referral_reason:
-        referral_reason = _clean_line(referral_reason)
+        reason_text = _clean_line(referral_reason)
     if referral_request_to_specialist:
         request_line = _clean_line(referral_request_to_specialist)
-    if not referral_reason:
-        referral_reason = f"Assessment and management of concerns related to {target.replace('_', ' ')}"
+    if not reason_text:
+        reason_text = f"Assessment and management of concerns related to {target.replace('_', ' ')}"
     if not request_line:
         request_line = "I would appreciate your assessment and recommendations for next steps."
 
@@ -362,7 +512,7 @@ def _format_referral_letter_text(
         "",
         f"Dear Dr. {recipient},",
         "",
-        f"Reason for Referral: {referral_reason}.",
+        f"Reason for Referral: {reason_text}.",
     ]
     if age is not None:
         if sex != "Not available in chart":
@@ -537,127 +687,6 @@ class QueuePrioritizationTask(AgentBackedTask["QueuePrioritizationTaskInput", Qu
         )
         state.setdefault("queue_priority_by_patient", {})[patient.patient_id] = out
         return out
-
-class ClinicianSummaryTaskInput(BaseModel):
-    patient_id: str
-    target_condition: str
-    horizon_months: int
-    risk_json: str
-    notes: str
-
-
-class RiskAssessmentTaskInput(BaseModel):
-    patient_id: str
-    target_condition: str
-    horizon_months: int
-    notes: str
-    risk_level_low_lt: float
-    risk_level_moderate_lt: float
-
-
-class QueuePrioritizationTaskInput(BaseModel):
-    clinic_goals: str
-    workflow_json: str
-    patient_id: str
-    notes: str
-    target_condition: str
-    horizon_months: int
-    risk_json: str
-    summary_json: str
-    followup_gap_json: str
-
-
-class ResultsSummaryTaskInput(BaseModel):
-    patient_id: str
-    target_condition: str
-    horizon_months: int
-    notes: str
-
-
-class FollowupGapDetectionTaskInput(BaseModel):
-    clinic_goals: str
-    patient_id: str
-    notes: str
-    summary_json: str
-    risk_json: str
-
-
-class LabTrendSummaryTaskInput(BaseModel):
-    timeframe_label: str
-    patient_id: str
-    notes: str
-
-
-class DifferentialDiagnosisTaskInput(BaseModel):
-    patient_id: str
-    target_condition: str
-    horizon_months: int
-    summary_json: str
-    notes: str
-
-
-class GuidelineComparisonTaskInput(BaseModel):
-    patient_id: str
-    target_condition: str
-    horizon_months: int
-    notes: str
-    risk_json: str
-    summary_json: str
-
-
-class AdminReferralTaskInput(BaseModel):
-    patient_id: str
-    target_condition: str
-    destination_service: str
-    urgency: str
-    risk_json: str
-    summary_json: str
-    guideline_json: str
-    notes: str
-
-
-class PatientInstructionsTaskInput(BaseModel):
-    patient_id: str
-    target_condition: str
-    horizon_months: int
-    summary_json: str
-    risk_json: str
-    followup_gap_json: str
-    admin_referral_json: str
-    notes: str
-
-
-class ReferralLetterTaskInput(BaseModel):
-    patient_id: str
-    target_condition: str
-    urgency: str
-    recipient: str
-    referral_json: str
-    risk_json: str
-    summary_json: str
-    notes: str
-    risk_key_points: List[str]
-    risk_score_text: Optional[str] = None
-    summary_key_points: List[str]
-    summary_medications_to_review: List[str]
-    referral_reason: Optional[str] = None
-    referral_request_to_specialist: Optional[str] = None
-    referral_required_pre_referral_steps: List[str]
-
-
-class ReferralIntakeChecklistTaskInput(BaseModel):
-    destination_service: str
-    patient_id: str
-    notes: str
-    admin_referral_json: str
-    workflow_json: str
-
-
-class CarePlanReconciliationTaskInput(BaseModel):
-    clinic_goals: str
-    patient_id: str
-    notes: str
-
 
 class ClinicianSummaryTask(AgentBackedTask[ClinicianSummaryTaskInput, ClinicianSummarySchema]):
     name = "clinician_summary"
