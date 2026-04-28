@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import json
 import os
+import sys
+import time
 from typing import Any, Dict, List, Optional
 
 from openai import OpenAI
@@ -31,6 +33,54 @@ class LLMJsonClient:
             else:
                 self.client = OpenAI(api_key=api_key)
         self.model = model or os.getenv("OPENAI_MODEL") or os.getenv("MEDFLOW_MODEL") or "gpt-4o-mini"
+        self.debug = str(os.getenv("FACETCARE_DEBUG_LLM", "")).strip().lower() in {"1", "true", "yes", "on"}
+
+    def _debug_log(self, message: str) -> None:
+        if self.debug:
+            print(f"[facetcare.llm] {message}", file=sys.stderr, flush=True)
+
+    def _preview_messages(self, messages: List[Dict[str, Any]], limit: int = 1500) -> str:
+        parts: List[str] = []
+        for i, msg in enumerate(messages):
+            role = str(msg.get("role", "?"))
+            content = msg.get("content", "")
+            if isinstance(content, list):
+                content = json.dumps(content, ensure_ascii=False)
+            content = str(content or "").replace("\n", "\\n")
+            parts.append(f"{i}:{role}:{content[:400]}")
+        joined = " | ".join(parts)
+        return joined[:limit]
+
+    def _chat_create(self, *, messages: List[Dict[str, Any]], temperature: float, tools: Optional[List[Dict[str, Any]]] = None, functions: Optional[List[Dict[str, Any]]] = None) -> Any:
+        started = time.time()
+        self._debug_log(
+            f"request start model={self.model!r} temp={temperature} messages={len(messages)} "
+            f"tools={len(tools) if tools else 0} functions={len(functions) if functions else 0} "
+            f"preview={self._preview_messages(messages)!r}"
+        )
+        try:
+            resp = self.client.chat.completions.create(
+                model=self.model,
+                messages=messages,
+                tools=tools,
+                functions=functions,
+                temperature=temperature,
+            )
+        except Exception as e:
+            elapsed = time.time() - started
+            self._debug_log(f"request error after {elapsed:.2f}s: {type(e).__name__}: {e}")
+            raise
+
+        elapsed = time.time() - started
+        try:
+            content = resp.choices[0].message.content
+        except Exception:
+            content = None
+        if isinstance(content, list):
+            content = json.dumps(content, ensure_ascii=False)
+        preview = str(content or "").replace("\n", "\\n")[:600]
+        self._debug_log(f"request ok after {elapsed:.2f}s raw_preview={preview!r}")
+        return resp
 
 
     def _medgemma_safe_messages(self, *, system: str, user: str) -> List[Dict[str, str]]:
@@ -78,8 +128,7 @@ class LLMJsonClient:
             "Malformed model output to repair:\n"
             f"{bad_text[:8000]}"
         )
-        resp = self.client.chat.completions.create(
-            model=self.model,
+        resp = self._chat_create(
             messages=self._medgemma_safe_messages(system=repair_system, user=repair_user),
             temperature=temperature,
         )
@@ -87,8 +136,7 @@ class LLMJsonClient:
         return parse_json_object_from_text(txt)
 
     def json_object_no_tools(self, *, system: str, user: str, temperature: float = 0.0) -> Dict[str, Any]:
-        resp = self.client.chat.completions.create(
-            model=self.model,
+        resp = self._chat_create(
             messages=self._medgemma_safe_messages(system=system, user=user),
             temperature=temperature,
         )
@@ -96,6 +144,7 @@ class LLMJsonClient:
         try:
             return parse_json_object_from_text(txt)
         except Exception:
+            self._debug_log(f"initial JSON parse failed, invoking repair. raw_text={str(txt)[:800]!r}")
             return self._repair_json_via_model(system=system, user=user, bad_text=txt, temperature=0.0)
 
     def json_object_with_tools(
@@ -114,15 +163,13 @@ class LLMJsonClient:
 
         for _ in range(max_rounds):
             if prefer_new_tools:
-                resp = self.client.chat.completions.create(
-                    model=self.model,
+                resp = self._chat_create(
                     messages=messages,
                     tools=[t.chat_tool for t in tool_specs],
                     temperature=temperature,
                 )
             else:
-                resp = self.client.chat.completions.create(
-                    model=self.model,
+                resp = self._chat_create(
                     messages=messages,
                     functions=[t.legacy_function for t in tool_specs],
                     temperature=temperature,
@@ -170,6 +217,7 @@ class LLMJsonClient:
             try:
                 return parse_json_object_from_text(last_text)
             except Exception:
+                self._debug_log(f"tool round produced malformed JSON, requesting strict re-output. raw_text={last_text[:800]!r}")
                 # Keep the tool transcript and ask the model to re-emit strict JSON.
                 messages.append(
                     {
