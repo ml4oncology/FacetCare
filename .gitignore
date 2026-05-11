@@ -1,0 +1,26 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon?
+._*
+.Spotlight-V100
+.Trashes
+.fseventsd
+
+# Local editor/project state
+.vscode/
+
+# Local RAG artifacts
+rag/pdfs/
+rag/processed/
+rag/qdrant/
+
+# Ignore any directory named archive at any depth
+archive/
+**/archive/

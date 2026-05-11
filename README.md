@@ -223,3 +223,36 @@ python web_app.py --endpoint http://127.0.0.1:8080/v1/ --model medgemma-1.5-4b-i
 ```
 
 Then open `http://127.0.0.1:5000` in a browser.
+
+## Local RAG pipeline
+
+This repository also includes a simple local RAG pipeline under `rag/pipelines/` that converts PDFs into a local Qdrant vector database.
+
+The flow is:
+
+* convert PDFs in `rag/pdfs/` into markdown files in `rag/processed/`
+* use a vision language model during PDF conversion to describe figures, flowcharts, and other visual regions
+* convert the markdown into Docling documents, chunk with Docling hybrid chunking, compute dense embeddings, and store the result in a local on-disk Qdrant collection under `rag/qdrant/`
+
+Example commands:
+
+```bash
+python rag/pipelines/convert_pdfs_to_markdown.py \
+  --base-url http://localhost:881/v1 \
+  --model qwen
+```
+
+```bash
+python rag/pipelines/build_qdrant_index.py \
+  --base-url http://localhost:881/v1 \
+  --embedding-model text-embedding-model \
+  --recreate
+```
+
+The RAG pipeline creates `rag/pdfs/`, `rag/processed/`, and `rag/qdrant/` automatically if they do not already exist.
+
+Additional packages needed for the RAG pipeline:
+
+```bash
+pip install pillow pymupdf docling qdrant-client langchain-openai openai
+```
